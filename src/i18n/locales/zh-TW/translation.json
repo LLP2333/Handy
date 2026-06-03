@@ -92,6 +92,10 @@
       "cohere-int8": {
         "name": "Cohere",
         "description": "大型模型，速度較慢，但多語言辨識非常準確。"
+      },
+      "doubao-seedasr-2.0": {
+        "name": "豆包 SeedASR 2.0",
+        "description": "字节跳动火山引擎云端语音识别。准确率高,需要配置 API Key 才能使用。"
       }
     },
     "errors": {
@@ -147,7 +151,9 @@
       "multiLanguage": "多語言",
       "languageOnly": "僅 {{language}}",
       "translation": "可翻譯為英語",
-      "translate": "翻譯為英語"
+      "translate": "翻譯為英語",
+      "cloud": "云端",
+      "cloudModel": "云端模型,使用前需要配置 API 凭据"
     }
   },
   "settings": {
@@ -536,6 +542,30 @@
           "description": "針對 OpenAI Whisper 自動語音識別模型的高效能推理引擎",
           "details": "Handy 使用 Whisper.cpp 進行快速的本機語音轉文字處理。感謝 Georgi Gerganov 和貢獻者們的傑出工作"
         }
+      }
+    },
+    "doubao": {
+      "title": "豆包语音识别凭据",
+      "description": "在火山引擎控制台申请新版 API Key 后填入。修改后立即生效;旧的连接会自动断开重建。",
+      "apiKey": {
+        "title": "API Key (X-Api-Key)",
+        "description": "新版控制台的 X-Api-Key,可在火山引擎语音识别大模型页面 → API 鉴权 中复制。",
+        "placeholder": "粘贴你的 X-Api-Key"
+      },
+      "resourceId": {
+        "title": "资源 ID (X-Api-Resource-Id)",
+        "description": "选择豆包模型版本。「2.0 小时版」按音频时长计费(默认),「2.0 并发版」按并发数包年。",
+        "duration": "流式语音识别 2.0(小时版)",
+        "concurrent": "流式语音识别 2.0(并发版)"
+      },
+      "testConnection": {
+        "title": "测试连接",
+        "description": "用当前凭据连接豆包做一次握手验证(不发送音频)。失败时会显示错误码与排错 Log ID。",
+        "button": "测试连接",
+        "running": "测试中…",
+        "success": "连接成功!凭据可用。",
+        "successWithLogid": "连接成功!Log ID:{{logid}}",
+        "failed": "连接失败:{{error}}"
       }
     }
   },

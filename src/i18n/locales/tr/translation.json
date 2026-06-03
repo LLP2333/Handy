@@ -92,6 +92,10 @@
       "cohere-int8": {
         "name": "Cohere",
         "description": "Büyük, daha yavaş, ancak çok doğru çok dilli bir model."
+      },
+      "doubao-seedasr-2.0": {
+        "name": "Doubao SeedASR 2.0",
+        "description": "Cloud streaming ASR by ByteDance Volcano Engine. High accuracy. Requires an API key."
       }
     },
     "errors": {
@@ -145,7 +149,9 @@
       "translation": "İngilizce'ye çevirebilir",
       "translate": "İngilizce'ye çevir",
       "singleLanguage": "Yalnızca bu dili destekler",
-      "languageOnly": "Yalnızca {{language}}"
+      "languageOnly": "Yalnızca {{language}}",
+      "cloud": "Cloud",
+      "cloudModel": "Cloud-hosted model — configure API credentials before use"
     },
     "cancel": "İptal",
     "cancelDownload": "İndirmeyi iptal et"
@@ -536,6 +542,30 @@
           "description": "OpenAI'nin Whisper otomatik konuşma tanıma modelinin yüksek performanslı çıkarımı",
           "details": "Handy, hızlı ve yerel konuşmadan metne dönüştürme için Whisper.cpp kullanır. Georgi Gerganov ve katkıda bulunanların harika çalışmaları için teşekkür ederiz."
         }
+      }
+    },
+    "doubao": {
+      "title": "Doubao Speech Recognition Credentials",
+      "description": "Paste a new-console API key from the Volcano Engine dashboard. Changes apply immediately; the previous connection will be replaced.",
+      "apiKey": {
+        "title": "API Key (X-Api-Key)",
+        "description": "Copy the X-Api-Key from Volcano Engine console → Speech Recognition → API Auth.",
+        "placeholder": "Paste your X-Api-Key"
+      },
+      "resourceId": {
+        "title": "Resource ID (X-Api-Resource-Id)",
+        "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
+        "duration": "Streaming ASR 2.0 (Hour)",
+        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+      },
+      "testConnection": {
+        "title": "Test Connection",
+        "description": "Performs an authentication handshake with the current credentials (no audio is sent). On failure, the error code and log ID are shown for support.",
+        "button": "Test Connection",
+        "running": "Testing...",
+        "success": "Connection succeeded — credentials are valid.",
+        "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
+        "failed": "Connection failed: {{error}}"
       }
     }
   },

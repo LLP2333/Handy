@@ -7,6 +7,7 @@ import { ModelCard } from "@/components/onboarding";
 import { useModelStore } from "@/stores/modelStore";
 import { LANGUAGES } from "@/lib/constants/languages.ts";
 import type { ModelInfo } from "@/bindings";
+import { DoubaoSettings } from "../cloud/DoubaoSettings";
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
@@ -317,30 +318,8 @@ export const ModelsSettings: React.FC = () => {
               </div>
             </div>
             {downloadedModels.map((model: ModelInfo) => (
-              <ModelCard
-                key={model.id}
-                model={model}
-                status={getModelStatus(model.id)}
-                onSelect={handleModelSelect}
-                onDownload={handleModelDownload}
-                onDelete={handleModelDelete}
-                onCancel={handleModelCancel}
-                downloadProgress={getDownloadProgress(model.id)}
-                downloadSpeed={getDownloadSpeed(model.id)}
-                showRecommended={false}
-              />
-            ))}
-          </div>
-
-          {/* Available Models Section */}
-          {availableModels.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-medium text-text/60">
-                {t("settings.models.availableModels")}
-              </h2>
-              {availableModels.map((model: ModelInfo) => (
+              <React.Fragment key={model.id}>
                 <ModelCard
-                  key={model.id}
                   model={model}
                   status={getModelStatus(model.id)}
                   onSelect={handleModelSelect}
@@ -351,6 +330,34 @@ export const ModelsSettings: React.FC = () => {
                   downloadSpeed={getDownloadSpeed(model.id)}
                   showRecommended={false}
                 />
+                {model.id === currentModel &&
+                  model.engine_type === "Doubao" && <DoubaoSettings />}
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Available Models Section */}
+          {availableModels.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium text-text/60">
+                {t("settings.models.availableModels")}
+              </h2>
+              {availableModels.map((model: ModelInfo) => (
+                <React.Fragment key={model.id}>
+                  <ModelCard
+                    model={model}
+                    status={getModelStatus(model.id)}
+                    onSelect={handleModelSelect}
+                    onDownload={handleModelDownload}
+                    onDelete={handleModelDelete}
+                    onCancel={handleModelCancel}
+                    downloadProgress={getDownloadProgress(model.id)}
+                    downloadSpeed={getDownloadSpeed(model.id)}
+                    showRecommended={false}
+                  />
+                  {model.id === currentModel &&
+                    model.engine_type === "Doubao" && <DoubaoSettings />}
+                </React.Fragment>
               ))}
             </div>
           )}

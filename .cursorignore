@@ -1,0 +1,33 @@
+# Build output
+node_modules/
+dist/
+dist-ssr/
+src-tauri/target/
+src-tauri/gen/
+
+# Locally bundled binary models (large, irrelevant to indexing)
+src-tauri/resources/models/
+
+# Logs and OS noise
+*.log
+.DS_Store
+
+# Lockfiles (ok for git, noise for editor index)
+bun.lock
+bun.lockb
+package-lock.json
+
+# Reference / vendor sample code (kept in repo for documentation only)
+docs/sauc_go/go.sum
+
+# Recording artifacts
+recording_*
+
+# Playwright test reports
+playwright-report/
+test-results/
+blob-report/
+
+# Nix
+result
+.direnv

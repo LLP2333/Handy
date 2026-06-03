@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 use tar::Archive;
 use tauri::{AppHandle, Emitter, Manager};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
 pub enum EngineType {
     Whisper,
     Parakeet,
@@ -27,6 +27,8 @@ pub enum EngineType {
     GigaAM,
     Canary,
     Cohere,
+    /// 火山引擎豆包流式语音识别 2.0(云端 WebSocket)。无本地模型文件,运行时调用网络 API。
+    Doubao,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -50,6 +52,10 @@ pub struct ModelInfo {
     pub supported_languages: Vec<String>, // Languages this model can transcribe
     pub supports_language_selection: bool, // Whether the user can explicitly pick a language
     pub is_custom: bool,            // Whether this is a user-provided custom model
+    /// `true` 表示该模型是云端服务,无需下载本地文件。
+    /// 前端用此字段隐藏下载/删除/大小等 UI 元素。
+    #[serde(default)]
+    pub is_cloud: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -147,6 +153,7 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -175,6 +182,7 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -202,6 +210,7 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -229,6 +238,7 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -257,6 +267,7 @@ impl ModelManager {
                 supported_languages: whisper_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -285,6 +296,7 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -322,6 +334,7 @@ impl ModelManager {
                 supported_languages: parakeet_v3_languages,
                 supports_language_selection: false,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -349,6 +362,7 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -378,6 +392,7 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -407,6 +422,7 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -436,6 +452,7 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -471,6 +488,7 @@ impl ModelManager {
                 supported_languages: sense_voice_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -501,6 +519,7 @@ impl ModelManager {
                 supported_languages: gigaam_languages,
                 supports_language_selection: false,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -535,6 +554,7 @@ impl ModelManager {
                 supported_languages: canary_flash_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -572,6 +592,7 @@ impl ModelManager {
                 supported_languages: canary_1b_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 
@@ -607,6 +628,44 @@ impl ModelManager {
                 supported_languages: cohere_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
+            },
+        );
+
+        // 豆包流式语音识别 2.0(火山引擎云端 ASR,需要 API Key)。
+        // 资源 ID 默认为 `volc.seedasr.sauc.duration`(2.0 小时版),可在前端切换为并发版。
+        let doubao_languages: Vec<String> = vec![
+            "zh", "zh-Hans", "zh-Hant", "en", "yue", "ja", "id", "es", "pt", "de", "fr", "ko",
+            "fil", "ms", "th", "ar", "it", "bn", "el", "nl", "ru", "tr", "vi", "pl", "ro", "ne",
+            "uk",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        available_models.insert(
+            "doubao-seedasr-2.0".to_string(),
+            ModelInfo {
+                id: "doubao-seedasr-2.0".to_string(),
+                name: "Doubao SeedASR 2.0".to_string(),
+                description: "Cloud streaming ASR by Volcano Engine. Requires API key (X-Api-Key)."
+                    .to_string(),
+                filename: String::new(),
+                url: None,
+                sha256: None,
+                size_mb: 0,
+                is_downloaded: true, // 云端,始终视为"已就绪"
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::Doubao,
+                accuracy_score: 0.92,
+                speed_score: 0.70,
+                supports_translation: false,
+                is_recommended: false,
+                supported_languages: doubao_languages,
+                supports_language_selection: true,
+                is_custom: false,
+                is_cloud: true,
             },
         );
 
@@ -723,6 +782,11 @@ impl ModelManager {
         let mut models = self.available_models.lock().unwrap();
 
         for model in models.values_mut() {
+            // 云端模型在 ModelManager::new 注册时就已固定 is_downloaded=true,
+            // 这里跳过文件系统检查避免被误判为"未下载"。
+            if model.is_cloud {
+                continue;
+            }
             if model.is_directory {
                 // For directory-based models, check if the directory exists
                 let model_path = self.models_dir.join(&model.filename);
@@ -927,6 +991,7 @@ impl ModelManager {
                     supported_languages: vec![],
                     supports_language_selection: true,
                     is_custom: true,
+                    is_cloud: false,
                 },
             );
         }
@@ -992,6 +1057,14 @@ impl ModelManager {
 
         let model_info =
             model_info.ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+
+        // 云端模型没有本地文件,不需要(也不能)下载。
+        if model_info.is_cloud {
+            return Err(anyhow::anyhow!(
+                "Model {} is a cloud model and cannot be downloaded",
+                model_id
+            ));
+        }
 
         let url = model_info
             .url
@@ -1335,6 +1408,14 @@ impl ModelManager {
         let model_info =
             model_info.ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
 
+        // 云端模型没有本地文件,无可删除内容。返回明确错误,UI 也应当不渲染删除按钮。
+        if model_info.is_cloud {
+            return Err(anyhow::anyhow!(
+                "Model {} is a cloud model and has no local files to delete",
+                model_id
+            ));
+        }
+
         debug!("ModelManager: Found model info: {:?}", model_info);
 
         let model_path = self.models_dir.join(&model_info.filename);
@@ -1398,6 +1479,12 @@ impl ModelManager {
         let model_info = self
             .get_model_info(model_id)
             .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+
+        // 云端模型不需要本地路径——TranscriptionManager 直接走 cloud_asr 客户端,
+        // 这里返回一个空 PathBuf 占位,调用方若试图用该路径会自然失败(空路径不会落盘)。
+        if model_info.is_cloud {
+            return Ok(PathBuf::new());
+        }
 
         if !model_info.is_downloaded {
             return Err(anyhow::anyhow!("Model not available: {}", model_id));
@@ -1520,6 +1607,7 @@ mod tests {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: true,
                 is_custom: false,
+                is_cloud: false,
             },
         );
 

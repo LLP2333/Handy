@@ -1,0 +1,63 @@
+---
+description: Handy 项目通用规则。涵盖工程命令、技术栈、目录结构与基本约定;开始任意修改前请先读取。
+alwaysApply: true
+---
+
+# Handy 项目工作约定
+
+Handy 是 Tauri 2.x + React/TypeScript 跨平台桌面端语音转写应用。**完整背景请优先阅读 [AGENTS.md](mdc:AGENTS.md)**,本文件只列高频需要遵守的硬规则。
+
+## 工程命令(必备)
+
+```bash
+# 开发环境
+bun install
+bun run tauri dev          # macOS 出现 cmake 报错时:CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri dev
+
+# 构建 / 打包
+bun run tauri build
+
+# 提交前必跑(双管齐下)
+bun run lint               # ESLint(前端)
+bun run format:check       # Prettier + cargo fmt(--check)
+cargo clippy --all-targets # 后端 lint
+cargo test                 # 后端测试
+```
+
+提交代码前必须保证以上四条命令均无错误/警告。`bun run lint:fix` 与 `bun run format` 可用于自动修复。
+
+## 技术栈关键点
+
+- **Tauri Command ↔ Frontend**:Rust 端用 `#[tauri::command]` + `#[specta::specta]`,通过 `tauri-specta` 自动生成到 [src/bindings.ts](mdc:src/bindings.ts)。**不要手改 `src/bindings.ts`**,改 Rust 后跑一次 `bun run tauri dev` 重生成。
+- **状态管理**:前端用 Zustand([src/stores/](mdc:src/stores)),后端 Manager 模式([src-tauri/src/managers/](mdc:src-tauri/src/managers))。
+- **设置存储**:`tauri-plugin-store` 持久化,字段定义在 [src-tauri/src/settings.rs](mdc:src-tauri/src/settings.rs) 的 `AppSettings`,默认值在同文件 `get_default_settings()`。新增字段必须加 `#[serde(default)]` 以保持向后兼容。
+- **凭据/密钥字段**:**必须**用 [`SecretMap`](mdc:src-tauri/src/settings.rs) 类型(自动 redact debug 输出),禁止裸 `String`。
+
+## 目录速览
+
+| 路径 | 职责 |
+|---|---|
+| `src-tauri/src/lib.rs` | Tauri 启动 + 命令注册(`collect_commands![...]`) |
+| `src-tauri/src/managers/` | AudioRecording / Model / Transcription / History 四大 Manager |
+| `src-tauri/src/audio_toolkit/` | 录音、重采样、VAD |
+| `src-tauri/src/commands/` | 部分 Tauri 命令处理器(模型/音频/历史) |
+| `src-tauri/src/cloud_asr/` | 云端 ASR 提供商客户端(目前包含 doubao) |
+| `src-tauri/src/shortcut/` | 快捷键 + 大量 `change_*_setting` 命令 |
+| `src/components/` | React UI 组件 |
+| `src/i18n/locales/<lang>/translation.json` | 多语言文本(en 为源,所有 key 必须在每个语言文件中存在) |
+
+## 编码风格
+
+- **TypeScript**:严格模式,禁止 `any`;函数式 React 组件 + hooks;Tailwind 优先;路径别名 `@/` → `./src/`。
+- **Rust**:遵循 `cargo fmt`;生产代码避免 `unwrap()` / `expect()`(测试中可用);用 `anyhow::Result` 返回错误并附上下文(`.map_err(|e| anyhow!("...: {e}"))`)。
+- **错误向用户传递**:Tauri 命令返回 `Result<T, String>`,Rust 内部用 `anyhow::Result`。
+
+## 平台注意事项
+
+- **macOS**:Metal 加速;键盘快捷键需要辅助功能权限。
+- **Windows**:Vulkan + DirectML;需要代码签名。
+- **Linux**:OpenBLAS + Vulkan;Wayland 支持有限;`HANDY_NO_GTK_LAYER_SHELL=1` 可禁用 GTK layer shell。
+
+## 提交信息
+
+使用 conventional commit 前缀(`feat:` / `fix:` / `docs:` / `refactor:` / `chore:` / `test:`),关注**为什么**而非**做了什么**。

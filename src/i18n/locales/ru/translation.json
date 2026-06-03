@@ -92,6 +92,10 @@
       "cohere-int8": {
         "name": "Cohere",
         "description": "Большая, медленная, но очень точная многоязычная модель."
+      },
+      "doubao-seedasr-2.0": {
+        "name": "Doubao SeedASR 2.0",
+        "description": "Cloud streaming ASR by ByteDance Volcano Engine. High accuracy. Requires an API key."
       }
     },
     "errors": {
@@ -145,7 +149,9 @@
       "translation": "Может переводить на английский",
       "translate": "Перевод на английский",
       "singleLanguage": "Поддерживает только этот язык",
-      "languageOnly": "Только {{language}}"
+      "languageOnly": "Только {{language}}",
+      "cloud": "Cloud",
+      "cloudModel": "Cloud-hosted model — configure API credentials before use"
     },
     "cancel": "Отмена",
     "cancelDownload": "Отменить загрузку"
@@ -536,6 +542,30 @@
           "description": "Высокопроизводительная модель автоматического распознавания речи OpenAI Whisper",
           "details": "Handy использует Whisper.cpp для быстрого локального преобразования речи в текст. Спасибо великолепной работе Георгия Герганова и участников."
         }
+      }
+    },
+    "doubao": {
+      "title": "Doubao Speech Recognition Credentials",
+      "description": "Paste a new-console API key from the Volcano Engine dashboard. Changes apply immediately; the previous connection will be replaced.",
+      "apiKey": {
+        "title": "API Key (X-Api-Key)",
+        "description": "Copy the X-Api-Key from Volcano Engine console → Speech Recognition → API Auth.",
+        "placeholder": "Paste your X-Api-Key"
+      },
+      "resourceId": {
+        "title": "Resource ID (X-Api-Resource-Id)",
+        "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
+        "duration": "Streaming ASR 2.0 (Hour)",
+        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+      },
+      "testConnection": {
+        "title": "Test Connection",
+        "description": "Performs an authentication handshake with the current credentials (no audio is sent). On failure, the error code and log ID are shown for support.",
+        "button": "Test Connection",
+        "running": "Testing...",
+        "success": "Connection succeeded — credentials are valid.",
+        "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
+        "failed": "Connection failed: {{error}}"
       }
     }
   },

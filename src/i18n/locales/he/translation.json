@@ -92,6 +92,10 @@
       "cohere-int8": {
         "name": "Cohere",
         "description": "מודל גדול, איטי יותר, אך מדויק מאוד ורב-לשוני."
+      },
+      "doubao-seedasr-2.0": {
+        "name": "Doubao SeedASR 2.0",
+        "description": "Cloud streaming ASR by ByteDance Volcano Engine. High accuracy. Requires an API key."
       }
     },
     "errors": {
@@ -147,7 +151,9 @@
       "multiLanguage": "רב-לשוני",
       "languageOnly": "{{language}} בלבד",
       "translation": "יכול לתרגם לאנגלית",
-      "translate": "תרגם לאנגלית"
+      "translate": "תרגם לאנגלית",
+      "cloud": "Cloud",
+      "cloudModel": "Cloud-hosted model — configure API credentials before use"
     }
   },
   "settings": {
@@ -536,6 +542,30 @@
           "description": "הסקה מהירה לביצועים גבוהים עבור מודל זיהוי הדיבור Whisper של OpenAI",
           "details": "Handy משתמש ב-Whisper.cpp לתמלול מהיר ומקומי. תודה לעבודה המדהימה של Georgi Gerganov וכל התורמים."
         }
+      }
+    },
+    "doubao": {
+      "title": "Doubao Speech Recognition Credentials",
+      "description": "Paste a new-console API key from the Volcano Engine dashboard. Changes apply immediately; the previous connection will be replaced.",
+      "apiKey": {
+        "title": "API Key (X-Api-Key)",
+        "description": "Copy the X-Api-Key from Volcano Engine console → Speech Recognition → API Auth.",
+        "placeholder": "Paste your X-Api-Key"
+      },
+      "resourceId": {
+        "title": "Resource ID (X-Api-Resource-Id)",
+        "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
+        "duration": "Streaming ASR 2.0 (Hour)",
+        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+      },
+      "testConnection": {
+        "title": "Test Connection",
+        "description": "Performs an authentication handshake with the current credentials (no audio is sent). On failure, the error code and log ID are shown for support.",
+        "button": "Test Connection",
+        "running": "Testing...",
+        "success": "Connection succeeded — credentials are valid.",
+        "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
+        "failed": "Connection failed: {{error}}"
       }
     }
   },

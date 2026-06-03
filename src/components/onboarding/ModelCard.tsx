@@ -2,6 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import {
   Check,
+  Cloud,
   Download,
   Globe,
   Languages,
@@ -217,13 +218,24 @@ const ModelCard: React.FC<ModelCardProps> = ({
             <span>{t("modelSelector.capabilities.translate")}</span>
           </div>
         )}
-        {status === "downloadable" && (
+        {model.is_cloud && (
+          <span
+            className="flex items-center gap-1.5 ms-auto text-xs text-logo-primary/80"
+            title={t("modelSelector.capabilities.cloudModel")}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>{t("modelSelector.capabilities.cloud")}</span>
+          </span>
+        )}
+        {!model.is_cloud && status === "downloadable" && (
           <span className="flex items-center gap-1.5 ms-auto text-xs text-text/50">
             <Download className="w-3.5 h-3.5" />
             <span>{formatModelSize(Number(model.size_mb))}</span>
           </span>
         )}
-        {onDelete && (status === "available" || status === "active") && (
+        {!model.is_cloud &&
+          onDelete &&
+          (status === "available" || status === "active") && (
           <Button
             variant="ghost"
             size="sm"

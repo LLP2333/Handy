@@ -430,6 +430,14 @@ pub struct AppSettings {
     pub whisper_gpu_device: i32,
     #[serde(default)]
     pub extra_recording_buffer_ms: u64,
+    /// 豆包(火山引擎)流式语音识别凭据。
+    ///
+    /// 使用 [`SecretMap`] 自动 redact debug 输出。当前支持的键:
+    /// - `api_key`:必填,新版控制台 X-Api-Key
+    /// - `resource_id`:可选,默认 `volc.seedasr.sauc.duration`(2.0 小时版),
+    ///   可填 `volc.seedasr.sauc.concurrent`(2.0 并发版)
+    #[serde(default = "default_doubao_credentials")]
+    pub doubao_credentials: SecretMap,
 }
 
 fn default_model() -> String {
@@ -610,6 +618,17 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
     });
 
     providers
+}
+
+/// 默认豆包凭据(空值占位):api_key 留空待用户填入,resource_id 默认指向 2.0 小时版。
+fn default_doubao_credentials() -> SecretMap {
+    let mut map = HashMap::new();
+    map.insert("api_key".to_string(), String::new());
+    map.insert(
+        "resource_id".to_string(),
+        "volc.seedasr.sauc.duration".to_string(),
+    );
+    SecretMap(map)
 }
 
 fn default_post_process_api_keys() -> SecretMap {
@@ -814,6 +833,7 @@ pub fn get_default_settings() -> AppSettings {
         ort_accelerator: OrtAcceleratorSetting::default(),
         whisper_gpu_device: default_whisper_gpu_device(),
         extra_recording_buffer_ms: 0,
+        doubao_credentials: default_doubao_credentials(),
     }
 }
 

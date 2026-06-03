@@ -1155,3 +1155,70 @@ pub async fn get_available_accelerators() -> crate::managers::transcription::Ava
         .await
         .expect("get_available_accelerators panicked")
 }
+
+/// 写入豆包凭据(api_key / resource_id)。
+///
+/// `key` 必须是合法字段名(目前只接受 `"api_key"` 与 `"resource_id"`),`value` 为空字符串
+/// 等同于清除该字段。修改 api_key 后会立即卸载已加载的豆包客户端,以便下次转录时按新凭据重建连接。
+///
+/// # Errors
+/// 当 `key` 不在白名单内时返回 `Err`。
+#[tauri::command]
+#[specta::specta]
+pub fn change_doubao_credential_setting(
+    app: AppHandle,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    const VALID_KEYS: [&str; 2] = ["api_key", "resource_id"];
+    if !VALID_KEYS.contains(&key.as_str()) {
+        return Err(format!(
+            "Invalid Doubao credential key '{}'. Allowed: {:?}",
+            key, VALID_KEYS
+        ));
+    }
+    let mut s = settings::get_settings(&app);
+    s.doubao_credentials.insert(key.clone(), value);
+    settings::write_settings(&app, s);
+
+    // api_key 变了——下次 transcribe 时让 TranscriptionManager 用新凭据重建。
+    if key == "api_key" {
+        let tm =
+            app.state::<std::sync::Arc<crate::managers::transcription::TranscriptionManager>>();
+        if tm.is_model_loaded() {
+            if let Err(e) = tm.unload_model() {
+                log::warn!("Failed to unload Doubao model after credential change: {e}");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// 用当前保存的凭据连接豆包做一次握手 + full client request + 首包 ack 验证,不发送任何音频。
+///
+/// 成功时返回 `X-Tt-Logid`(便于在火山引擎工单中排错;若服务端未返回则为空字符串)。
+/// 失败时返回错误描述(包含 HTTP 错误、握手错误、豆包业务错误码等)。
+#[tauri::command]
+#[specta::specta]
+pub async fn test_doubao_connection(app: AppHandle) -> Result<String, String> {
+    let s = settings::get_settings(&app);
+    let api_key = s
+        .doubao_credentials
+        .get("api_key")
+        .cloned()
+        .unwrap_or_default();
+    let resource_id = s
+        .doubao_credentials
+        .get("resource_id")
+        .cloned()
+        .unwrap_or_default();
+    if api_key.trim().is_empty() {
+        return Err("Doubao API key is empty".to_string());
+    }
+    let client = crate::cloud_asr::doubao::DoubaoClient::new(api_key, resource_id);
+    client
+        .verify_credentials()
+        .await
+        .map(|logid| logid.unwrap_or_default())
+        .map_err(|e| e.to_string())
+}

@@ -45,6 +45,8 @@ enum LoadedEngine {
     GigaAM(GigaAMModel),
     Canary(CanaryModel),
     Cohere(CohereModel),
+    /// 豆包云端 ASR 客户端。每次 transcribe 调用都新建 WebSocket 连接,客户端本身无状态。
+    Doubao(crate::cloud_asr::doubao::DoubaoClient),
 }
 
 /// RAII guard that clears the `is_loading` flag and notifies waiters on drop.
@@ -377,6 +379,31 @@ impl TranscriptionManager {
                 })?;
                 LoadedEngine::Cohere(engine)
             }
+            EngineType::Doubao => {
+                // 云端模型不依赖 model_path,只用凭据构造客户端。
+                // 读取设置中的 doubao_credentials(SecretMap),api_key 必填、resource_id 可选。
+                let settings = get_settings(&self.app_handle);
+                let api_key = settings
+                    .doubao_credentials
+                    .get("api_key")
+                    .cloned()
+                    .filter(|s| !s.trim().is_empty())
+                    .ok_or_else(|| {
+                        let msg =
+                            "Doubao API key not configured. Please set it in Settings → Models.";
+                        emit_loading_failed(msg);
+                        anyhow::anyhow!(msg)
+                    })?;
+                let resource_id = settings
+                    .doubao_credentials
+                    .get("resource_id")
+                    .cloned()
+                    .unwrap_or_default();
+                LoadedEngine::Doubao(crate::cloud_asr::doubao::DoubaoClient::new(
+                    api_key,
+                    resource_id,
+                ))
+            }
         };
 
         // Update the current engine and model ID
@@ -628,6 +655,50 @@ impl TranscriptionManager {
                             cohere_engine
                                 .transcribe(&audio, &options)
                                 .map_err(|e| anyhow::anyhow!("Cohere transcription failed: {}", e))
+                        }
+                        LoadedEngine::Doubao(client) => {
+                            // 把 Handy 的简码映射到豆包要求的 BCP-47 语种代码。
+                            // 未列出的代码原样透传(豆包文档列了 25 种,常见前缀不冲突)。
+                            let lang = match validated_language.as_str() {
+                                "auto" => None,
+                                "zh" | "zh-Hans" | "zh-Hant" => Some("zh-CN".to_string()),
+                                "en" => Some("en-US".to_string()),
+                                "ja" => Some("ja-JP".to_string()),
+                                "ko" => Some("ko-KR".to_string()),
+                                "yue" => Some("yue-CN".to_string()),
+                                "ru" => Some("ru-RU".to_string()),
+                                "fr" => Some("fr-FR".to_string()),
+                                "de" => Some("de-DE".to_string()),
+                                "es" => Some("es-MX".to_string()),
+                                "pt" => Some("pt-BR".to_string()),
+                                "id" => Some("id-ID".to_string()),
+                                "fil" => Some("fil-PH".to_string()),
+                                "ms" => Some("ms-MY".to_string()),
+                                "th" => Some("th-TH".to_string()),
+                                "ar" => Some("ar-SA".to_string()),
+                                "it" => Some("it-IT".to_string()),
+                                "bn" => Some("bn-BD".to_string()),
+                                "el" => Some("el-GR".to_string()),
+                                "nl" => Some("nl-NL".to_string()),
+                                "tr" => Some("tr-TR".to_string()),
+                                "vi" => Some("vi-VN".to_string()),
+                                "pl" => Some("pl-PL".to_string()),
+                                "ro" => Some("ro-RO".to_string()),
+                                "ne" => Some("ne-NP".to_string()),
+                                "uk" => Some("uk-UA".to_string()),
+                                other => Some(other.to_string()),
+                            };
+                            // 豆包客户端是 async 的,Handy 的 transcribe 是同步函数;
+                            // 用 Tauri 自带的 async runtime 桥接。这里阻塞当前线程是可接受的——
+                            // transcribe 本来就在专用线程上跑,不会阻塞 UI。
+                            let text = tauri::async_runtime::block_on(
+                                client.transcribe(&audio, lang.as_deref()),
+                            )
+                            .map_err(|e| anyhow::anyhow!("Doubao transcription failed: {}", e))?;
+                            Ok(transcribe_rs::TranscriptionResult {
+                                text,
+                                segments: None,
+                            })
                         }
                     }
                 },

@@ -64,6 +64,8 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 - `audio_toolkit/` - Low-level audio processing:
   - `audio/` - Device enumeration, recording, resampling
   - `vad/` - Voice Activity Detection (Silero VAD)
+- `cloud_asr/` - Cloud ASR provider clients (network-based engines)
+  - `doubao/` - Volcano Engine (ByteDance) Doubao SeedASR 2.0 over WebSocket. See [docs/cloud-asr-doubao.md](docs/cloud-asr-doubao.md).
 - `commands/` - Tauri command handlers for frontend communication
 - `cli.rs` - CLI argument definitions (clap derive)
 - `shortcut.rs` - Global keyboard shortcut handling
@@ -94,7 +96,7 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 
 **Command-Event Architecture:** Frontend → Backend via Tauri commands; Backend → Frontend via events.
 
-**Pipeline Processing:** Audio → VAD → Whisper/Parakeet → Text output → Clipboard/Paste
+**Pipeline Processing:** Audio → VAD → Local engine (Whisper/Parakeet/...) **or** Cloud client (Doubao) → Text output → Clipboard/Paste
 
 **State Flow:** Zustand → Tauri Command → Rust State → Persistence (tauri-plugin-store)
 
@@ -112,9 +114,9 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 ### Application Flow
 
 1. **Initialization:** App starts minimized to tray, loads settings, initializes managers
-2. **Model Setup:** First-run downloads preferred Whisper model (Small/Medium/Turbo/Large)
+2. **Model Setup:** First-run downloads preferred Whisper model (Small/Medium/Turbo/Large). Cloud models (e.g. Doubao) skip download but require API credentials.
 3. **Recording:** Global shortcut triggers audio recording with VAD filtering
-4. **Processing:** Audio sent to Whisper model for transcription
+4. **Processing:** Audio sent to selected engine — local model via [transcribe-rs](https://crates.io/crates/transcribe-rs), or cloud provider via the corresponding `cloud_asr/<provider>` client (currently Doubao over WebSocket).
 5. **Output:** Text pasted to active application via system clipboard
 
 ### Settings System
@@ -123,8 +125,9 @@ Settings are stored using Tauri's store plugin with reactive updates:
 
 - Keyboard shortcuts (configurable, supports push-to-talk)
 - Audio devices (microphone/output selection)
-- Model preferences (Small/Medium/Turbo/Large Whisper variants)
+- Model preferences (Small/Medium/Turbo/Large Whisper variants, plus Doubao SeedASR 2.0 cloud)
 - Audio feedback and translation options
+- **Cloud ASR credentials** (`SecretMap` based, automatically redacted in debug output): currently `doubao_credentials` with keys `api_key` and `resource_id`
 
 ### Single Instance Architecture
 

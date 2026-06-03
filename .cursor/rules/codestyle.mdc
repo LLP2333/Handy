@@ -1,0 +1,44 @@
+---
+description: 代码风格细则 —— 注释、组件、PR/Commit 信息约定。
+alwaysApply: true
+---
+
+# 代码风格细则
+
+## 注释:写"为什么"不写"什么"
+
+| 不可接受 | 可接受 |
+|---|---|
+| `// 自增 seq` | `// 末包用负 seq 触发服务器 NEG_WITH_SEQUENCE 标志` |
+| `// 设置 enable_itn 为 true` | (无需注释,字段名已自解释) |
+| `// 调用 API` | `// 这里阻塞是因为外部调用方是同步上下文` |
+
+代码本身能表达"做了什么",注释只补充**意图、约束、权衡**。冗余的"narrate"型注释一律删除。
+
+## 提交信息 / PR 标题
+
+- 用 conventional commit 前缀:`feat:` / `fix:` / `docs:` / `refactor:` / `chore:` / `test:` / `perf:`
+- 不要使用表情(emoji)
+- 主语聚焦"为什么需要这条变更",而不是机械列出文件名
+- 例:
+  - 好:`feat: 接入豆包流式 ASR 作为云端转录引擎`
+  - 差:`update files in src-tauri`、`✨ add doubao`
+
+## React / TypeScript 风格
+
+- 全部使用**函数组件 + hooks**,禁止 class 组件
+- Props 类型用 `interface` 或 `type`,exported props 必须命名为 `<Component>Props`
+- Tailwind 优先;复用类组合用 [src/lib/utils](mdc:src/lib/utils) 下的工具(`cn()` 等)
+- 组件文件名 PascalCase(`DoubaoSettings.tsx`),hook 文件名 camelCase + `use` 前缀(`useSettings.ts`)
+
+## Rust 风格
+
+- 错误处理用 `anyhow::Result<T>`(内部) + `Result<T, String>`(Tauri 命令边界);用 `.map_err(|e| anyhow!("ctx: {e}"))` 加上下文
+- 公开 enum / struct 的字段如果序列化进 JSON,必须配 `#[serde(...)]`,新增字段一律加 `#[serde(default)]` 保证向后兼容
+- 涉及二进制协议时,字段名/常量名照搬协议文档原文(便于和文档对照)
+
+## 国际化
+
+- 不要在 JSX 内写中英文字符串;统一通过 `t('key.path')` 调用
+- 新增 key 必须**全语言同步**(目前 en/de/es/fr/ja/ru/zh 等),缺漏视为未完成
+- key 命名层级要清晰:`<area>.<feature>.<field>`,例如 `settings.doubao.apiKey`、`onboarding.models.doubao-seedasr-2.0.name`

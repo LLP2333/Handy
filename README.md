@@ -24,12 +24,13 @@ Handy isn't trying to be the best speech-to-text app—it's trying to be the mos
 3. **Release** and Handy processes your speech using Whisper
 4. **Get** your transcribed text pasted directly into whatever app you're using
 
-The process is entirely local:
+The process is entirely local by default (cloud engines are opt-in):
 
 - Silence is filtered using VAD (Voice Activity Detection) with Silero
 - Transcription uses your choice of models:
   - **Whisper models** (Small/Medium/Turbo/Large) with GPU acceleration when available
   - **Parakeet V3** - CPU-optimized model with excellent performance and automatic language detection
+  - **Doubao SeedASR 2.0** (cloud, opt-in) - Volcano Engine streaming ASR for high-accuracy Chinese / multilingual transcription. Requires an API key. See [docs/cloud-asr-doubao.md](docs/cloud-asr-doubao.md).
 - Works on Windows, macOS, and Linux
 
 ## Quick Start

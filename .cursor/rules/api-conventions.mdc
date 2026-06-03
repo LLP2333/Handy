@@ -1,0 +1,66 @@
+---
+description: 新增公开接口/Tauri 命令/前端组件的强制规约 —— 注释 / 测试 / 文档三件套必须齐全。
+alwaysApply: true
+---
+
+# 新增接口三件套(强制)
+
+每次新增**公开接口**(Rust `pub fn` / `#[tauri::command]` / TypeScript exported function / React 公开组件 props)必须同时完成以下三件事,缺一不可:
+
+## 1. 注释(Doc Comments)
+
+- **Rust**:在函数/struct/enum 上方写 `///` 注释,说明:
+  - 用途(一句话)
+  - 各参数含义(必要时)
+  - 返回值含义(尤其是 `Result` 的 Err 分支何时触发)
+  - 副作用(写文件、emit 事件、阻塞调用等)
+  
+  示例:
+  ```rust
+  /// 写入豆包凭据(api_key / resource_id)。
+  ///
+  /// `key` 必须是合法字段名(`api_key` 或 `resource_id`),`value` 为空字符串等同于清除该字段。
+  /// 写入后立即持久化到 settings store。
+  ///
+  /// # Errors
+  /// 当 `key` 不在白名单内时返回 `Err`。
+  #[tauri::command]
+  #[specta::specta]
+  pub fn change_doubao_credential_setting(...) -> Result<(), String> { ... }
+  ```
+
+- **TypeScript**:对外 export 的函数/组件加 JSDoc(`/** ... */`),至少描述用途与每个非平凡参数。
+- 禁止"什么(what)"型注释(例如 `// 自增计数器`),只写"为什么(why)"或非显而易见的契约。
+
+## 2. 单元测试(Unit Tests)
+
+- **Rust 新公开函数 / Tauri 命令**:必须在同一 crate 内提供至少一个 `#[test]`。
+  - 协议/序列化/解析类放在文件末尾的 `#[cfg(test)] mod tests { ... }`
+  - 涉及外部 IO(网络/真实凭据)的集成测试用 `#[ignore]` 标注,从环境变量读凭据,CI 默认跳过、本地 `cargo test -- --ignored` 才跑。
+- **新前端组件**:若有非平凡逻辑(state / 副作用),提供至少一个 vitest/RTL 测试或可手动复现的 storybook 故事;UI 微件可豁免。
+
+## 3. 文档同步(Documentation)
+
+- **新 Rust 命令 / 后端模块**:在 [AGENTS.md](mdc:AGENTS.md) 对应小节(Backend Structure 或 CLI Parameters 等)更新一行说明。
+- **新用户可见配置 / 云服务接入**:在 [docs/](mdc:docs) 目录新增或更新中文用户指南(命名风格 `cloud-asr-<provider>.md` 或 `<feature>-用户指南.md`)。
+- **新前端文本**:必须走 i18next:
+  - 在每一个 `src/i18n/locales/<lang>/translation.json`(目前包括 en、zh、de、es、fr、ja、ru 等)中**同步登记 key**,缺少任何一个语言文件视为不完整。
+  - 组件中用 `const { t } = useTranslation(); t('key.path')`,**禁止 JSX 内硬编码字符串**(ESLint 也会拦)。
+
+## 凭据与密钥
+
+任何"用户填入的密钥/Token/API Key"字段:
+- **类型必须用** [`SecretMap`](mdc:src-tauri/src/settings.rs)(自动在 Debug 输出中 redact),不得直接用 `HashMap<String, String>` 或裸 `String`。
+- 前端输入框默认应是 `<input type="password">`,可提供"显示/隐藏"切换。
+- 不要把凭据 echo 进日志;只在 `log::trace!` 级别打印长度或前 2 字符。
+
+## Review 自检清单
+
+提交 PR 前自查:
+
+- [ ] 所有新 `pub fn` / `#[tauri::command]` 都有 `///` 文档注释
+- [ ] 所有新公开接口都有至少一个单元测试
+- [ ] 用户可见的新功能在 `docs/` 或 `AGENTS.md` 有对应说明
+- [ ] 所有新 i18n key 在 7 种语言文件中都已登记(可先复用 en 文本但 key 必须存在)
+- [ ] 凭据字段使用 `SecretMap`
+- [ ] `bun run lint` / `cargo clippy` / `cargo test` 全绿
