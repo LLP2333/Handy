@@ -330,8 +330,10 @@ export const ModelsSettings: React.FC = () => {
                   downloadSpeed={getDownloadSpeed(model.id)}
                   showRecommended={false}
                 />
-                {model.id === currentModel &&
-                  model.engine_type === "Doubao" && <DoubaoSettings />}
+                {/* 豆包凭据面板:云端模型卡片下始终展示,
+                    不依赖 currentModel —— 否则用户在没配 API key 时
+                    永远选不中豆包,也就永远看不到这个表单(死锁)。 */}
+                {model.engine_type === "Doubao" && <DoubaoSettings />}
               </React.Fragment>
             ))}
           </div>
@@ -355,8 +357,8 @@ export const ModelsSettings: React.FC = () => {
                     downloadSpeed={getDownloadSpeed(model.id)}
                     showRecommended={false}
                   />
-                  {model.id === currentModel &&
-                    model.engine_type === "Doubao" && <DoubaoSettings />}
+                  {/* 同 downloadedModels:云端凭据面板始终随卡片展示。 */}
+                  {model.engine_type === "Doubao" && <DoubaoSettings />}
                 </React.Fragment>
               ))}
             </div>
