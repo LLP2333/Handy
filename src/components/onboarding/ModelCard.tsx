@@ -55,6 +55,11 @@ interface ModelCardProps {
   downloadProgress?: number;
   downloadSpeed?: number; // MB/s
   showRecommended?: boolean;
+  /**
+   * 去除卡片自身的边框 / 圆角 / 背景与 hover 缩放,使其可无缝嵌入到外层容器中。
+   * 用于把模型卡片与其配置面板(如豆包凭据)合并为同一个框时,由外层容器统一负责边框与选中态高亮。
+   */
+  bare?: boolean;
 }
 
 const ModelCard: React.FC<ModelCardProps> = ({
@@ -70,6 +75,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
   downloadProgress,
   downloadSpeed,
   showRecommended = true,
+  bare = false,
 }) => {
   const { t } = useTranslation();
   const isFeatured = variant === "featured";
@@ -80,10 +86,13 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const displayName = getTranslatedModelName(model, t);
   const displayDescription = getTranslatedModelDescription(model, t);
 
-  const baseClasses =
-    "flex flex-col rounded-xl px-4 py-3 gap-2 text-left transition-all duration-200";
+  const baseClasses = `flex flex-col px-4 py-3 gap-2 text-left transition-all duration-200 ${
+    bare ? "" : "rounded-xl"
+  }`;
 
   const getVariantClasses = () => {
+    // 嵌入模式下边框与选中态高亮交由外层容器统一处理
+    if (bare) return "";
     if (status === "active") {
       return "border-2 border-logo-primary/50 bg-logo-primary/10";
     }
@@ -96,6 +105,8 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const getInteractiveClasses = () => {
     if (!isClickable) return "";
     if (disabled) return "opacity-50 cursor-not-allowed";
+    // 嵌入模式下去掉缩放 / 阴影 / 边框 hover,避免在外层框内被 overflow 裁剪
+    if (bare) return "cursor-pointer hover:bg-logo-primary/5 group";
     return "cursor-pointer hover:border-logo-primary/50 hover:bg-logo-primary/5 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] group";
   };
 
@@ -236,17 +247,17 @@ const ModelCard: React.FC<ModelCardProps> = ({
         {!model.is_cloud &&
           onDelete &&
           (status === "available" || status === "active") && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            title={t("modelSelector.deleteModel", { modelName: displayName })}
-            className="flex items-center gap-1.5 ms-auto text-logo-primary/85 hover:text-logo-primary hover:bg-logo-primary/10"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>{t("common.delete")}</span>
-          </Button>
-        )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              title={t("modelSelector.deleteModel", { modelName: displayName })}
+              className="flex items-center gap-1.5 ms-auto text-logo-primary/85 hover:text-logo-primary hover:bg-logo-primary/10"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{t("common.delete")}</span>
+            </Button>
+          )}
       </div>
 
       {/* Download/extract progress */}

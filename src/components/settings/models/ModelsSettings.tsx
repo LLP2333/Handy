@@ -154,6 +154,46 @@ export const ModelsSettings: React.FC = () => {
     }
   };
 
+  // 渲染单个模型条目。豆包等云端模型把模型卡片与凭据配置面板合并进同一个外层框:
+  // 卡片以 bare 形式嵌入(无自身边框),配置在框内折叠展开,而非堆成上下两个独立方框。
+  const renderModelEntry = (model: ModelInfo) => {
+    const status = getModelStatus(model.id);
+    const card = (
+      <ModelCard
+        model={model}
+        status={status}
+        onSelect={handleModelSelect}
+        onDownload={handleModelDownload}
+        onDelete={handleModelDelete}
+        onCancel={handleModelCancel}
+        downloadProgress={getDownloadProgress(model.id)}
+        downloadSpeed={getDownloadSpeed(model.id)}
+        showRecommended={false}
+        bare={model.engine_type === "Doubao"}
+      />
+    );
+
+    if (model.engine_type !== "Doubao") {
+      return <React.Fragment key={model.id}>{card}</React.Fragment>;
+    }
+
+    return (
+      <div
+        key={model.id}
+        className={`overflow-hidden rounded-xl border-2 transition-colors ${
+          status === "active"
+            ? "border-logo-primary/50 bg-logo-primary/10"
+            : "border-mid-gray/20"
+        }`}
+      >
+        {card}
+        {/* 凭据面板与卡片同框:不依赖 currentModel,否则未配置 API key 时
+            永远选不中豆包、也就看不到配置入口(死锁)。 */}
+        <DoubaoSettings />
+      </div>
+    );
+  };
+
   // Filter models based on language filter
   const filteredModels = useMemo(() => {
     return models.filter((model: ModelInfo) => {
@@ -317,25 +357,7 @@ export const ModelsSettings: React.FC = () => {
                 )}
               </div>
             </div>
-            {downloadedModels.map((model: ModelInfo) => (
-              <React.Fragment key={model.id}>
-                <ModelCard
-                  model={model}
-                  status={getModelStatus(model.id)}
-                  onSelect={handleModelSelect}
-                  onDownload={handleModelDownload}
-                  onDelete={handleModelDelete}
-                  onCancel={handleModelCancel}
-                  downloadProgress={getDownloadProgress(model.id)}
-                  downloadSpeed={getDownloadSpeed(model.id)}
-                  showRecommended={false}
-                />
-                {/* 豆包凭据面板:云端模型卡片下始终展示,
-                    不依赖 currentModel —— 否则用户在没配 API key 时
-                    永远选不中豆包,也就永远看不到这个表单(死锁)。 */}
-                {model.engine_type === "Doubao" && <DoubaoSettings />}
-              </React.Fragment>
-            ))}
+            {downloadedModels.map(renderModelEntry)}
           </div>
 
           {/* Available Models Section */}
@@ -344,23 +366,7 @@ export const ModelsSettings: React.FC = () => {
               <h2 className="text-sm font-medium text-text/60">
                 {t("settings.models.availableModels")}
               </h2>
-              {availableModels.map((model: ModelInfo) => (
-                <React.Fragment key={model.id}>
-                  <ModelCard
-                    model={model}
-                    status={getModelStatus(model.id)}
-                    onSelect={handleModelSelect}
-                    onDownload={handleModelDownload}
-                    onDelete={handleModelDelete}
-                    onCancel={handleModelCancel}
-                    downloadProgress={getDownloadProgress(model.id)}
-                    downloadSpeed={getDownloadSpeed(model.id)}
-                    showRecommended={false}
-                  />
-                  {/* 同 downloadedModels:云端凭据面板始终随卡片展示。 */}
-                  {model.engine_type === "Doubao" && <DoubaoSettings />}
-                </React.Fragment>
-              ))}
+              {availableModels.map(renderModelEntry)}
             </div>
           )}
         </div>
