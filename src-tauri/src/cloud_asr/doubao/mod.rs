@@ -1,6 +1,7 @@
 //! 豆包(火山引擎)流式语音识别 2.0 客户端。
 //!
-//! 端点:`wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream`
+//! 端点:转录走双向流式优化版 `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async`
+//! (低延迟,只在结果变化时回包);「测试连接」走 `bigmodel_nostream`(发配置即回 ack)。
 //! 鉴权:新版控制台只需 `X-Api-Key`(配合 `X-Api-Resource-Id` 选定模型版本)。
 //!
 //! 协议参考:`docs/豆包语音输入接入.md` 与 `docs/sauc_go/`(官方 Go 示例)。

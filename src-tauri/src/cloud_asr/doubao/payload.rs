@@ -86,8 +86,9 @@ impl AsrRequestPayload {
 /// [header 4B][seq=1 i32 BE 4B][payload_size i32 BE 4B][gzip(JSON) Nb]
 /// ```
 ///
-/// `language` 透传给 `audio.language`。注意:**bigmodel_nostream 接口才支持 language 字段**,
-/// 双向流式接口不支持。当前固定使用 nostream 端点,因此可以传任意支持的 BCP-47 代码。
+/// `language` 透传给 `audio.language`。注意:**只有 bigmodel_nostream 接口支持 language 字段**,
+/// 双向流式(含优化版 bigmodel_async)不支持。转录已切到 async 优化版,调用方应传 `None`;
+/// `language` 形参仅为将来若回退 nostream 时保留。
 pub fn build_full_client_request(language: Option<String>) -> Result<Vec<u8>> {
     let header = encode_header(
         CLIENT_FULL_REQUEST,

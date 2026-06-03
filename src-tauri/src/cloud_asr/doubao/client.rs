@@ -3,8 +3,15 @@
 //! 与 Handy 的"录完一段批量发"语义对齐:本客户端**不**做 push-to-talk 实时上屏,只在 audio
 //! 全部分包发送完(末包用负 sequence 标志)后,聚合服务端返回的最终 `result.text` 一次性返回。
 //!
-//! 端点固定为 `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream`(流式输入模式,
-//! 准确率最高,与 Handy 场景最契合)。
+//! 转录端点用**双向流式优化版** `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async`:
+//! 服务端「只在识别结果有变化时才回包」,首字/尾字时延比流式输入(nostream)更低,适合追求低
+//! 延迟的场景。代价是该模式不支持 `language` 字段、准确率略逊于 nostream 二遍。
+//!
+//! 注意:async 优化版**不会**在收到 full client request 后回 ack(没有"每包一回"),因此发完
+//! 配置包必须立即开始灌音频、并发读响应——绝不能像 nostream 那样阻塞等首包,否则会死等。
+//!
+//! 「测试连接」(`verify_credentials`)仍走 nostream 端点:它发完配置即回 ack、无需音频、零成本,
+//! 且鉴权与 `resource_id` 与端点无关,用它验证凭据最稳。
 //!
 //! 参考:`docs/sauc_go/client/client.go`、`docs/豆包语音输入接入.md`。
 
@@ -25,8 +32,12 @@ use super::payload::{
 };
 use super::response::parse_response;
 
-/// 默认接入端点(流式输入模式 / 火山引擎大模型 ASR)。
-pub const DEFAULT_ENDPOINT: &str = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream";
+/// 转录默认端点:双向流式优化版(低延迟,首字/尾字时延更优,只在结果变化时回包)。
+pub const DEFAULT_ENDPOINT: &str = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async";
+
+/// 凭据验证端点:流式输入模式。它在收到 full client request 后即回 ack,无需发送音频即可
+/// 验证鉴权与 `resource_id`,被 [`DoubaoClient::verify_credentials`]("测试连接")使用。
+const VERIFY_ENDPOINT: &str = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream";
 
 /// 豆包流式语音识别 2.0 小时版资源 ID(默认值)。
 pub const DEFAULT_RESOURCE_ID: &str = "volc.seedasr.sauc.duration";
@@ -115,16 +126,20 @@ impl DoubaoClient {
             .context("Doubao verify_credentials_blocking failed")
     }
 
-    /// 转录一段已录完的 16 kHz / 单声道 / `f32` 音频。
+    /// 转录一段已录完的 16 kHz / 单声道 / `f32` 音频(双向流式优化版 `bigmodel_async`)。
     ///
-    /// `language` 用 BCP-47 风格(`"zh-CN"` / `"en-US"`),`None` 时由豆包按默认中英文+方言识别。
+    /// `language` 参数仅为接口兼容保留:**async 优化版不支持 `language` 字段**(见
+    /// `docs/豆包语音输入接入.md` 第 211 行),传入值只用于调试日志,不会下发给服务端,语种由
+    /// 豆包默认的中英文+方言模型自动判别。
+    ///
     /// 流程:
     /// 1. f32 → pcm_s16le
     /// 2. WebSocket 建连(鉴权 header)
-    /// 3. full client request(JSON 配置)
-    /// 4. 按 200ms/包顺序发送 audio only request,末包用负 sequence
-    /// 5. 接收所有 server response,直到末包标志或错误码非零
-    /// 6. 返回最终 `result.text`
+    /// 3. full client request(JSON 配置,seq=1)
+    /// 4. **不等 ack**,立即按 200ms/包顺序发送 audio only request(seq 从 2 递增),末包用负 sequence,
+    ///    边发边并发读响应——async 优化版只在结果变化时回包,阻塞等首包会死等
+    /// 5. 末包发完后继续读,直到末包标志或错误码非零
+    /// 6. 返回最终 `result.text`(默认 `result_type=full`,全量,逐包覆盖)
     ///
     /// # 错误
     /// - 网络/握手失败
@@ -141,13 +156,14 @@ impl DoubaoClient {
 
         let pcm = f32_samples_to_pcm_s16le(audio);
         debug!(
-            "Doubao: transcribing {} f32 samples ({} PCM bytes)",
+            "Doubao(async): transcribing {} f32 samples ({} PCM bytes); language hint {:?} ignored (async optimized mode doesn't support it)",
             audio.len(),
-            pcm.len()
+            pcm.len(),
+            language,
         );
 
         let request_id = uuid::Uuid::new_v4().to_string();
-        let request = self.build_handshake_request(&request_id)?;
+        let request = self.build_handshake_request(&request_id, &self.endpoint)?;
 
         let (mut ws_stream, response) = tokio_tungstenite::connect_async(request)
             .await
@@ -161,32 +177,20 @@ impl DoubaoClient {
             info!("Doubao logid={} request_id={}", logid, request_id);
         }
 
-        // 1) full client request
-        let full_req = build_full_client_request(language.map(|s| s.to_string()))?;
+        // 1) full client request(async 不下发 language)
+        let full_req = build_full_client_request(None)?;
         ws_stream
             .send(Message::Binary(full_req))
             .await
             .map_err(|e| anyhow!("send full client request failed: {e}"))?;
 
-        // 等待首包响应(豆包通常会先回 ack)
-        if let Some(msg) = ws_stream.next().await {
-            let msg = msg.map_err(|e| anyhow!("read first response failed: {e}"))?;
-            if let Message::Binary(bytes) = msg {
-                let parsed = parse_response(&bytes)?;
-                if parsed.code != 0 {
-                    return Err(anyhow!(
-                        "Doubao server error on full client request: code={}, msg={:?}",
-                        parsed.code,
-                        parsed.payload.and_then(|p| p.error)
-                    ));
-                }
-            }
-        }
-
         // 2) 分包发送音频
         // 首包 seq=1 用于 full client request,音频包从 seq=2 开始递增。
+        // 关键:async 优化版「只在结果变化时回包」、不保证有 ack,因此发完 config 直接灌音频,
+        // 绝不能在这里阻塞等首包(否则在没结果可回时会死等)。
         let total_packets = pcm.len().div_ceil(SEGMENT_SIZE_BYTES);
         let mut text_buf = String::new();
+        let mut got_last = false;
 
         for (seq, (idx, chunk)) in (2_i32..).zip(pcm.chunks(SEGMENT_SIZE_BYTES).enumerate()) {
             let is_last = idx + 1 == total_packets;
@@ -198,25 +202,30 @@ impl DoubaoClient {
                 .await
                 .map_err(|e| anyhow!("send audio packet seq={seq_to_send} failed: {e}"))?;
 
-            // 一边发包一边非阻塞读取响应(避免末包前丢响应)。
-            // 豆包 nostream 通常只在末包前后才返回真正结果,这里轻读不强求。
+            // 边发边并发读:async 会随结果变化推增量/全量包,这里及时收掉避免堆积;
+            // 短 tick(10ms)在不影响读取的前提下尽快把音频灌完,压低上传耗时。
             tokio::select! {
                 msg = ws_stream.next() => {
                     if let Some(Ok(Message::Binary(bytes))) = msg {
                         if let Ok(parsed) = parse_response(&bytes) {
+                            let was_last = parsed.is_last_package;
                             handle_parsed(parsed, &mut text_buf)?;
+                            if was_last {
+                                got_last = true;
+                                break;
+                            }
                         }
                     }
                 }
-                _ = sleep(Duration::from_millis(20)) => {}
+                _ = sleep(Duration::from_millis(10)) => {}
             }
         }
 
-        // 3) 末包发完后,继续读直到末包标志或错误。
-        // 30s 总尾部超时——豆包 nostream 通常在末包后 1~3 秒返回最终结果。如果服务端因任何
+        // 3) 末包发完后(若发送循环里还没读到末包标志),继续读直到末包标志或错误。
+        // 30s 总尾部超时——async 优化版通常在末包后亚秒级返回最终结果。如果服务端因任何
         // 原因不发结束帧,这里至少不会让录音完毕的用户无限等下去。
         let tail_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-        loop {
+        while !got_last {
             let msg = match tokio::time::timeout_at(tail_deadline, ws_stream.next()).await {
                 Ok(Some(m)) => m.map_err(|e| anyhow!("read tail response failed: {e}"))?,
                 Ok(None) => {
@@ -234,7 +243,7 @@ impl DoubaoClient {
                     let was_last = parsed.is_last_package;
                     handle_parsed(parsed, &mut text_buf)?;
                     if was_last {
-                        break;
+                        got_last = true;
                     }
                 }
                 Message::Close(_) => break,
@@ -253,6 +262,11 @@ impl DoubaoClient {
 
     /// 仅做一次 WebSocket 握手 + full client request + 首包 ack,用来验证凭据是否可用。
     ///
+    /// **刻意走 nostream 端点([`VERIFY_ENDPOINT`])而非转录用的 async 优化版**:nostream 在收到
+    /// 配置包后立即回 ack,无需发送音频即可探活;而 async 优化版「只在结果变化时回包」,纯握手不发
+    /// 音频会拿不到响应、导致「测试连接」一直转圈。鉴权与 `resource_id` 都与端点无关,因此用 nostream
+    /// 验证凭据完全等价,且零音频成本。
+    ///
     /// 不发送音频,不读取最终结果,因此对豆包计费几乎为零。成功时返回 `X-Tt-Logid`(可选,
     /// 用于排错);失败时返回错误描述(包含豆包返回的 `code` / `error` 信息)。
     pub async fn verify_credentials(&self) -> Result<Option<String>> {
@@ -260,7 +274,7 @@ impl DoubaoClient {
             return Err(anyhow!("Doubao API key is empty"));
         }
         let request_id = uuid::Uuid::new_v4().to_string();
-        let request = self.build_handshake_request(&request_id)?;
+        let request = self.build_handshake_request(&request_id, VERIFY_ENDPOINT)?;
         let (mut ws_stream, response) = tokio_tungstenite::connect_async(request)
             .await
             .map_err(|e| anyhow!("Doubao WebSocket dial failed: {e}"))?;
@@ -309,15 +323,17 @@ impl DoubaoClient {
     }
 
     /// 构造带鉴权 header 的 WebSocket 握手 Request。
-    fn build_handshake_request(&self, request_id: &str) -> Result<Request<()>> {
-        let uri: Uri = self
-            .endpoint
+    ///
+    /// `endpoint` 显式传入而非固定读 `self.endpoint`:转录走 async 优化版,而「测试连接」需要走
+    /// nostream 端点(见 [`Self::verify_credentials`]),两者复用同一套鉴权头。
+    fn build_handshake_request(&self, request_id: &str, endpoint: &str) -> Result<Request<()>> {
+        let uri: Uri = endpoint
             .parse()
-            .map_err(|e| anyhow!("invalid Doubao endpoint URI {}: {e}", self.endpoint))?;
+            .map_err(|e| anyhow!("invalid Doubao endpoint URI {}: {e}", endpoint))?;
 
         let host = uri
             .host()
-            .ok_or_else(|| anyhow!("Doubao endpoint missing host: {}", self.endpoint))?
+            .ok_or_else(|| anyhow!("Doubao endpoint missing host: {}", endpoint))?
             .to_string();
 
         let mut req = Request::builder()
@@ -389,7 +405,9 @@ mod tests {
     #[test]
     fn test_handshake_request_has_required_headers() {
         let client = DoubaoClient::new("test-key".to_string(), DEFAULT_RESOURCE_ID.to_string());
-        let req = client.build_handshake_request("rid-1234").unwrap();
+        let req = client
+            .build_handshake_request("rid-1234", &client.endpoint)
+            .unwrap();
         let headers = req.headers();
         assert_eq!(headers.get("X-Api-Key").unwrap(), "test-key");
         assert_eq!(
@@ -398,6 +416,29 @@ mod tests {
         );
         assert_eq!(headers.get("X-Api-Request-Id").unwrap(), "rid-1234");
         assert_eq!(headers.get("X-Api-Sequence").unwrap(), "-1");
+    }
+
+    /// 转录端点必须是双向流式优化版(低延迟),验证端点必须是 nostream(发配置即回 ack)。
+    #[test]
+    fn test_endpoints_select_expected_modes() {
+        assert!(
+            DEFAULT_ENDPOINT.ends_with("/bigmodel_async"),
+            "transcribe must use the async optimized endpoint for low latency, got {DEFAULT_ENDPOINT}"
+        );
+        assert!(
+            VERIFY_ENDPOINT.ends_with("/bigmodel_nostream"),
+            "verify must use the nostream endpoint (it acks on config without audio), got {VERIFY_ENDPOINT}"
+        );
+    }
+
+    /// async 优化版的握手请求应当指向 async 端点,且鉴权头完整。
+    #[test]
+    fn test_handshake_uses_given_endpoint() {
+        let client = DoubaoClient::new("k".to_string(), DEFAULT_RESOURCE_ID.to_string());
+        let req = client
+            .build_handshake_request("rid", VERIFY_ENDPOINT)
+            .unwrap();
+        assert!(req.uri().to_string().ends_with("/bigmodel_nostream"));
     }
 
     /// 真实的端到端测试,需要 `DOUBAO_API_KEY` 环境变量与可用的网络。
