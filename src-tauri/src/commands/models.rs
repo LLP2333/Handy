@@ -122,11 +122,15 @@ pub fn switch_active_model(app: &AppHandle, model_id: &str) -> Result<(), String
 
     write_settings(app, settings);
 
-    // Skip eager loading if unload is set to "Immediately" — the model
-    // will be loaded on-demand during the next transcription.
-    if unload_timeout == ModelUnloadTimeout::Immediately {
-        // Notify frontend — load_model won't be called so no events
-        // would otherwise be emitted.
+    // Skip eager loading in two cases:
+    // 1. unload_timeout == Immediately: model is always loaded on-demand.
+    // 2. is_cloud: cloud models have no local file and may require credentials
+    //    configured *after* selection (e.g. user picks Doubao first, then enters
+    //    API key in the now-visible settings panel). Forcing an eager load here
+    //    would deadlock the UX — the load fails on missing creds, we'd revert
+    //    `selected_model`, and the user would never see the credential form
+    //    that's gated on the model being currently selected.
+    if unload_timeout == ModelUnloadTimeout::Immediately || model_info.is_cloud {
         let _ = app.emit(
             "model-state-changed",
             ModelStateEvent {
@@ -137,8 +141,10 @@ pub fn switch_active_model(app: &AppHandle, model_id: &str) -> Result<(), String
             },
         );
         log::info!(
-            "Model selection changed to {} (not loading — unload set to Immediately).",
-            model_id
+            "Model selection changed to {} (deferred load: cloud={}, immediate={}).",
+            model_id,
+            model_info.is_cloud,
+            unload_timeout == ModelUnloadTimeout::Immediately,
         );
         return Ok(());
     }

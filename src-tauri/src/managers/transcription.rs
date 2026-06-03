@@ -439,10 +439,23 @@ impl TranscriptionManager {
         Ok(())
     }
 
-    /// Kicks off the model loading in a background thread if it's not already loaded
+    /// Returns true when the currently loaded engine matches `settings.selected_model`.
+    ///
+    /// Guards against "stale engine" — `is_model_loaded()` alone is not enough because
+    /// the loaded engine may belong to the *previously* selected model (e.g. cloud
+    /// models intentionally skip eager load on selection, so the old engine survives
+    /// a model switch). Without this check, transcribe() would silently dispatch
+    /// audio to the wrong engine.
+    fn loaded_engine_matches_selection(&self) -> bool {
+        let target = get_settings(&self.app_handle).selected_model;
+        self.get_current_model().as_deref() == Some(target.as_str()) && self.is_model_loaded()
+    }
+
+    /// Kicks off the model loading in a background thread if it's not already loaded,
+    /// or if the loaded engine doesn't match the currently selected model.
     pub fn initiate_model_load(&self) {
         let mut is_loading = self.is_loading.lock().unwrap();
-        if *is_loading || self.is_model_loaded() {
+        if *is_loading || self.loaded_engine_matches_selection() {
             return;
         }
 
@@ -688,13 +701,16 @@ impl TranscriptionManager {
                                 "uk" => Some("uk-UA".to_string()),
                                 other => Some(other.to_string()),
                             };
-                            // 豆包客户端是 async 的,Handy 的 transcribe 是同步函数;
-                            // 用 Tauri 自带的 async runtime 桥接。这里阻塞当前线程是可接受的——
-                            // transcribe 本来就在专用线程上跑,不会阻塞 UI。
-                            let text = tauri::async_runtime::block_on(
-                                client.transcribe(&audio, lang.as_deref()),
-                            )
-                            .map_err(|e| anyhow::anyhow!("Doubao transcription failed: {}", e))?;
+                            // 必须用 client 自带 runtime 的同步入口,而不是 tauri::async_runtime
+                            // 的 block_on——快捷键录音路径下,这个同步 transcribe() 是从一个
+                            // 已经持有 tokio runtime 的 worker thread 调过来的,在那种线程上
+                            // 调外层 runtime 的 block_on 会触发 "Cannot start a runtime from
+                            // within a runtime" panic。client 内部维护独立 runtime 来避开这个坑。
+                            let text = client
+                                .transcribe_blocking(&audio, lang.as_deref())
+                                .map_err(|e| {
+                                    anyhow::anyhow!("Doubao transcription failed: {}", e)
+                                })?;
                             Ok(transcribe_rs::TranscriptionResult {
                                 text,
                                 segments: None,

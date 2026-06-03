@@ -10,7 +10,7 @@
 
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use futures_util::{SinkExt, StreamExt};
 use log::{debug, info, warn};
 use tokio::time::sleep;
@@ -65,6 +65,54 @@ impl DoubaoClient {
             resource_id,
             endpoint: DEFAULT_ENDPOINT.to_string(),
         }
+    }
+
+    /// 在一个 **干净的 OS 线程** 上跑给定的 future 并 block 直到返回。
+    ///
+    /// # 为什么需要这层包装
+    ///
+    /// 1. Tokio 通过 thread-local 标记「当前线程是否在驱动 runtime」。一旦调用线程被外层
+    ///    runtime 标记(Tauri 的 async 命令处理器、`#[tokio::main]` worker 等),**任何**
+    ///    `Runtime::block_on` 都会 panic with "Cannot start a runtime from within a runtime"——
+    ///    它检查的是 OS 线程标记,与是哪个 runtime 实例无关。
+    /// 2. 反过来,**长生命周期** 的 runtime 持有又会带来另一个坑:[`Runtime`] 的 [`Drop`]
+    ///    会阻塞等待 worker 完成,而在 async context 里 drop runtime 会触发
+    ///    "Cannot drop a runtime in a context where blocking is not allowed"。
+    ///
+    /// 所以我们采用最朴素的方案:**每次调用都启动一个临时 OS 线程,在那个线程上现场建一个
+    /// `current_thread` runtime,跑完 future 立即销毁**。开销在 µs 量级,相比一次豆包
+    /// WebSocket 往返(秒级)完全可以忽略,但彻底回避两类 runtime 嵌套陷阱。
+    fn run_blocking<F, T>(future: F) -> Result<T>
+    where
+        F: std::future::Future<Output = Result<T>> + Send,
+        T: Send,
+    {
+        std::thread::scope(|scope| {
+            let handle = scope.spawn(move || -> Result<T> {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .context("failed to build temporary tokio runtime for blocking call")?;
+                rt.block_on(future)
+            });
+            handle
+                .join()
+                .map_err(|_| anyhow!("Doubao blocking worker thread panicked"))?
+        })
+    }
+
+    /// 同步入口:把 [`Self::transcribe`] 包装成可从 **任意线程** 安全调用的同步 API。
+    pub fn transcribe_blocking(&self, audio: &[f32], language: Option<&str>) -> Result<String> {
+        Self::run_blocking(self.transcribe(audio, language))
+            .context("Doubao transcribe_blocking failed")
+    }
+
+    /// 同步入口:对应 [`Self::verify_credentials`]。
+    /// 主要给同步上下文(未来可能的 CLI 自检)使用;UI 路径仍可直接 `await` async 版本。
+    #[allow(dead_code)]
+    pub fn verify_credentials_blocking(&self) -> Result<Option<String>> {
+        Self::run_blocking(self.verify_credentials())
+            .context("Doubao verify_credentials_blocking failed")
     }
 
     /// 转录一段已录完的 16 kHz / 单声道 / `f32` 音频。
@@ -164,9 +212,22 @@ impl DoubaoClient {
             }
         }
 
-        // 3) 末包发完后,继续读直到末包标志或错误
-        while let Some(msg) = ws_stream.next().await {
-            let msg = msg.map_err(|e| anyhow!("read tail response failed: {e}"))?;
+        // 3) 末包发完后,继续读直到末包标志或错误。
+        // 30s 总尾部超时——豆包 nostream 通常在末包后 1~3 秒返回最终结果。如果服务端因任何
+        // 原因不发结束帧,这里至少不会让录音完毕的用户无限等下去。
+        let tail_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            let msg = match tokio::time::timeout_at(tail_deadline, ws_stream.next()).await {
+                Ok(Some(m)) => m.map_err(|e| anyhow!("read tail response failed: {e}"))?,
+                Ok(None) => {
+                    warn!("Doubao server closed before sending last_package frame");
+                    break;
+                }
+                Err(_) => {
+                    warn!("Doubao tail read timed out after 30s; returning what we have so far");
+                    break;
+                }
+            };
             match msg {
                 Message::Binary(bytes) => {
                     let parsed = parse_response(&bytes)?;
@@ -216,9 +277,10 @@ impl DoubaoClient {
             .await
             .map_err(|e| anyhow!("send full client request failed: {e}"))?;
 
-        if let Some(msg) = ws_stream.next().await {
-            let msg = msg.map_err(|e| anyhow!("read first response failed: {e}"))?;
-            if let Message::Binary(bytes) = msg {
+        // 加超时,避免服务端不响应导致 UI「测试连接」按钮无限转圈。豆包 ack 通常 <1s,
+        // 给 10s 既宽裕又不至于让用户误以为程序卡死。
+        match tokio::time::timeout(Duration::from_secs(10), ws_stream.next()).await {
+            Ok(Some(Ok(Message::Binary(bytes)))) => {
                 let parsed = parse_response(&bytes)?;
                 if parsed.code != 0 {
                     return Err(anyhow!(
@@ -227,6 +289,18 @@ impl DoubaoClient {
                         parsed.payload.and_then(|p| p.error)
                     ));
                 }
+            }
+            Ok(Some(Ok(_))) => {} // 非 binary 帧(ping/text 之类),忽略
+            Ok(Some(Err(e))) => {
+                return Err(anyhow!("read first response failed: {e}"));
+            }
+            Ok(None) => {
+                return Err(anyhow!("Doubao server closed connection before responding"));
+            }
+            Err(_) => {
+                return Err(anyhow!(
+                    "Doubao server did not respond within 10s; check network or X-Api-Resource-Id"
+                ));
             }
         }
 
@@ -406,5 +480,46 @@ mod tests {
 
         eprintln!("识别结果: {}", text);
         assert!(!text.trim().is_empty(), "真实语音应当能识别出文本");
+    }
+
+    /// 回归测试:验证 [`DoubaoClient::transcribe_blocking`] 可以在 **已有 tokio runtime
+    /// 的线程** 上安全调用,而不触发 "Cannot start a runtime from within a runtime" panic。
+    ///
+    /// 这正是 Handy 快捷键录音路径会遇到的实际场景——actions.rs 在 async 任务里同步调
+    /// `transcribe()`,如果 `transcribe_blocking` 内部直接 `Runtime::block_on`(没切换到
+    /// 干净 OS 线程),就会 panic。Tokio 的 thread-local runtime 标记与 runtime flavor
+    /// 无关,因此 default `current_thread` flavor 同样足以复现。
+    ///
+    /// ```bash
+    /// DOUBAO_API_KEY=xxx cargo test -p handy --lib \
+    ///     test_transcribe_blocking_in_tokio_runtime -- --ignored --nocapture
+    /// ```
+    #[ignore]
+    #[tokio::test]
+    async fn test_transcribe_blocking_in_tokio_runtime() {
+        let api_key = match std::env::var("DOUBAO_API_KEY") {
+            Ok(k) => k,
+            Err(_) => {
+                eprintln!("DOUBAO_API_KEY not set; skipping nested-runtime test");
+                return;
+            }
+        };
+        let client = DoubaoClient::new(api_key, DEFAULT_RESOURCE_ID.to_string());
+
+        // 1 秒静音 PCM,16 kHz mono,够走完一次 WS 会话。重点不是结果,而是
+        // 调用本身不能 panic——这是修复 std::thread::scope 的核心验证点。
+        let audio = vec![0.0f32; 16000];
+
+        // 直接在当前 tokio worker thread 上调同步 API。修复前必 panic;修复后正常返回。
+        // 这是核心验证点 —— Handy 快捷键路径下,actions.rs 的 async 任务就是这样直接调
+        // 同步的 transcribe(),内部走到 transcribe_blocking,如果不脱离当前 worker 就会
+        // 触发 "Cannot start a runtime from within a runtime"。
+        let result = client.transcribe_blocking(&audio, Some("zh-CN"));
+        eprintln!("transcribe_blocking on tokio worker = {:?}", result);
+        assert!(
+            result.is_ok(),
+            "transcribe_blocking on tokio worker should not panic, got {:?}",
+            result.err()
+        );
     }
 }
