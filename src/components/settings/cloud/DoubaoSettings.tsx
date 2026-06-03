@@ -1,16 +1,28 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Cloud, Loader2 } from "lucide-react";
+import {
+  AudioLines,
+  Check,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { commands } from "@/bindings";
 import { Alert } from "../../ui/Alert";
 import { Button } from "../../ui/Button";
-import { Dropdown, SettingContainer } from "@/components/ui";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { useSettings } from "../../../hooks/useSettings";
 
 const RESOURCE_ID_DURATION = "volc.seedasr.sauc.duration";
 const RESOURCE_ID_CONCURRENT = "volc.seedasr.sauc.concurrent";
+
+/** 火山引擎控制台:申请 / 查看 X-Api-Key。 */
+const GET_KEY_URL = "https://console.volcengine.com/speech/app";
+/** 火山引擎语音技术文档(接入教程)。 */
+const TUTORIAL_URL = "https://www.volcengine.com/docs/6561";
 
 type TestState =
   | { status: "idle" }
@@ -19,12 +31,14 @@ type TestState =
   | { status: "error"; message: string };
 
 /**
- * 豆包(火山引擎)流式语音识别凭据设置面板。
+ * 火山引擎(豆包)流式语音识别服务商配置面板。
  *
- * 包含 API Key 输入(`password`)、资源 ID 选择(2.0 小时版/2.0 并发版)、
- * 「测试连接」按钮(会通过 `commands.testDoubaoConnection` 做一次轻量握手验证)。
+ * 视觉上对齐火山引擎控制台的「服务商设置」风格:品牌头部(图标 + 名称 + 接入教程链接 +
+ * 配置状态)、全宽 API Key 输入(附「获取密钥」外链)、可选的模型版本卡片(小时版 / 并发版,
+ * 带「推荐 / 当前使用」徽章),以及一次轻量握手的「测试连接」。
  *
- * 仅在用户当前选中模型为 `engine_type === "Doubao"` 时挂载,见 `ModelsSettings.tsx`。
+ * 鉴权用新版控制台的 `X-Api-Key`(而非旧版 App ID + Access Token),与后端
+ * `DoubaoClient` 的握手实现保持一致。仅在豆包模型卡片下渲染,见 `ModelsSettings.tsx`。
  */
 export const DoubaoSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -33,6 +47,7 @@ export const DoubaoSettings: React.FC = () => {
   const credentials = settings?.doubao_credentials ?? {};
   const apiKey = credentials.api_key ?? "";
   const resourceId = credentials.resource_id ?? RESOURCE_ID_DURATION;
+  const isConfigured = apiKey.trim().length > 0;
 
   const [savingKey, setSavingKey] = useState(false);
   const [savingResource, setSavingResource] = useState(false);
@@ -48,10 +63,14 @@ export const DoubaoSettings: React.FC = () => {
       {
         value: RESOURCE_ID_DURATION,
         label: t("settings.doubao.resourceId.duration"),
+        description: t("settings.doubao.resourceId.durationDesc"),
+        recommended: true,
       },
       {
         value: RESOURCE_ID_CONCURRENT,
         label: t("settings.doubao.resourceId.concurrent"),
+        description: t("settings.doubao.resourceId.concurrentDesc"),
+        recommended: false,
       },
     ],
     [t],
@@ -75,7 +94,7 @@ export const DoubaoSettings: React.FC = () => {
   };
 
   const handleResourceChange = async (next: string) => {
-    if (next === resourceId) return;
+    if (next === resourceId || savingResource) return;
     setSavingResource(true);
     try {
       const result = await commands.changeDoubaoCredentialSetting(
@@ -102,88 +121,171 @@ export const DoubaoSettings: React.FC = () => {
   };
 
   return (
-    <div className="rounded-lg border border-mid-gray/30 bg-mid-gray/5 p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Cloud className="w-4 h-4 text-logo-primary" />
-        <h3 className="text-sm font-semibold">{t("settings.doubao.title")}</h3>
+    <div className="rounded-xl border border-mid-gray/30 bg-mid-gray/5 overflow-hidden">
+      {/* 品牌头部 —— 对齐火山引擎控制台服务商卡片 */}
+      <div className="flex items-center gap-3 border-b border-mid-gray/20 bg-background/40 px-4 py-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-logo-primary to-background-ui text-white shadow-sm">
+          <AudioLines className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-sm font-semibold">
+              {t("settings.doubao.provider")}
+            </h3>
+            <button
+              type="button"
+              onClick={() => openUrl(TUTORIAL_URL)}
+              className="inline-flex items-center gap-0.5 text-xs font-medium text-logo-primary hover:underline"
+            >
+              {t("settings.doubao.tutorial")}
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
+          <p className="truncate text-xs text-text/60">
+            {t("settings.doubao.providerDesc")}
+          </p>
+        </div>
+        <div
+          className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+            isConfigured
+              ? "bg-green-500/10 text-green-500"
+              : "bg-amber-500/10 text-amber-500"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              isConfigured ? "bg-green-500" : "bg-amber-500"
+            }`}
+          />
+          {isConfigured
+            ? t("settings.doubao.configured")
+            : t("settings.doubao.unconfigured")}
+        </div>
       </div>
-      <p className="text-xs text-text/60 -mt-1">
-        {t("settings.doubao.description")}
-      </p>
 
-      <SettingContainer
-        title={t("settings.doubao.apiKey.title")}
-        description={t("settings.doubao.apiKey.description")}
-        descriptionMode="tooltip"
-        layout="horizontal"
-        grouped
-      >
-        <div className="flex items-center gap-2">
+      <div className="space-y-4 p-4">
+        {/* API Key */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium">
+              {t("settings.doubao.apiKey.title")}
+            </label>
+            <button
+              type="button"
+              onClick={() => openUrl(GET_KEY_URL)}
+              className="inline-flex items-center gap-0.5 text-xs text-logo-primary hover:underline"
+            >
+              {t("settings.doubao.getKey")}
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
           <ApiKeyField
             value={apiKey}
             onBlur={handleApiKeyChange}
             placeholder={t("settings.doubao.apiKey.placeholder")}
             disabled={savingKey}
-            className="min-w-[320px]"
+            className="w-full"
           />
         </div>
-      </SettingContainer>
 
-      <SettingContainer
-        title={t("settings.doubao.resourceId.title")}
-        description={t("settings.doubao.resourceId.description")}
-        descriptionMode="tooltip"
-        layout="horizontal"
-        grouped
-      >
-        <Dropdown
-          selectedValue={resourceId}
-          options={resourceOptions}
-          onSelect={handleResourceChange}
-          disabled={savingResource}
-        />
-      </SettingContainer>
+        {/* 模型版本 —— 可选卡片,对齐火山引擎控制台「模型」区 */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">
+            {t("settings.doubao.modelSection")}
+          </label>
+          <div className="space-y-2">
+            {resourceOptions.map((option) => {
+              const selected = option.value === resourceId;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleResourceChange(option.value)}
+                  disabled={savingResource}
+                  className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed ${
+                    selected
+                      ? "border-logo-primary bg-logo-primary/10"
+                      : "border-mid-gray/30 bg-background/40 hover:border-logo-primary/50"
+                  }`}
+                >
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      selected
+                        ? "bg-logo-primary/20 text-logo-primary"
+                        : "bg-mid-gray/15 text-text/50"
+                    }`}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-semibold">
+                        {option.label}
+                      </span>
+                      {option.recommended && (
+                        <span className="shrink-0 rounded bg-logo-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-logo-primary">
+                          {t("settings.doubao.recommended")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-text/60">
+                      {option.description}
+                    </p>
+                  </div>
+                  {selected && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-500">
+                      <Check className="h-3 w-3" />
+                      {t("settings.doubao.current")}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      <SettingContainer
-        title={t("settings.doubao.testConnection.title")}
-        description={t("settings.doubao.testConnection.description")}
-        descriptionMode="tooltip"
-        layout="horizontal"
-        grouped
-      >
-        <Button
-          onClick={handleTestConnection}
-          disabled={!apiKey || testState.status === "running"}
-          variant="secondary"
-          size="sm"
-        >
-          {testState.status === "running" ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-              {t("settings.doubao.testConnection.running")}
-            </>
-          ) : (
-            t("settings.doubao.testConnection.button")
-          )}
-        </Button>
-      </SettingContainer>
+        {/* 测试连接 */}
+        <div className="flex flex-wrap items-center gap-3 border-t border-mid-gray/20 pt-3">
+          <Button
+            onClick={handleTestConnection}
+            disabled={!apiKey || testState.status === "running"}
+            variant="primary-soft"
+            size="md"
+          >
+            {testState.status === "running" ? (
+              <span className="flex items-center">
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                {t("settings.doubao.testConnection.running")}
+              </span>
+            ) : (
+              <span className="flex items-center">
+                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                {t("settings.doubao.testConnection.button")}
+              </span>
+            )}
+          </Button>
+          <p className="flex-1 text-xs text-text/50">
+            {t("settings.doubao.testConnection.description")}
+          </p>
+        </div>
 
-      {testState.status === "success" && (
-        <Alert variant="success" contained>
-          {testState.logid
-            ? t("settings.doubao.testConnection.successWithLogid", {
-                logid: testState.logid,
-              })
-            : t("settings.doubao.testConnection.success")}
-        </Alert>
-      )}
-      {testState.status === "error" && (
-        <Alert variant="error" contained>
-          {t("settings.doubao.testConnection.failed", {
-            error: testState.message,
-          })}
-        </Alert>
-      )}
+        {testState.status === "success" && (
+          <Alert variant="success">
+            {testState.logid
+              ? t("settings.doubao.testConnection.successWithLogid", {
+                  logid: testState.logid,
+                })
+              : t("settings.doubao.testConnection.success")}
+          </Alert>
+        )}
+        {testState.status === "error" && (
+          <Alert variant="error">
+            {t("settings.doubao.testConnection.failed", {
+              error: testState.message,
+            })}
+          </Alert>
+        )}
+      </div>
     </div>
   );
 };

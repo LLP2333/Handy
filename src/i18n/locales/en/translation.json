@@ -547,6 +547,15 @@
     "doubao": {
       "title": "Doubao Speech Recognition Credentials",
       "description": "Paste a new-console API key from the Volcano Engine dashboard. Changes apply immediately; the previous connection will be replaced.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Speech recognition provider · Doubao streaming ASR",
+      "tutorial": "Setup guide",
+      "getKey": "Get your API key",
+      "configured": "Configured",
+      "unconfigured": "Not configured",
+      "modelSection": "Model edition",
+      "recommended": "Recommended",
+      "current": "In use",
       "apiKey": {
         "title": "API Key (X-Api-Key)",
         "description": "Copy the X-Api-Key from Volcano Engine console → Speech Recognition → API Auth.",
@@ -556,7 +565,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Billed by audio duration · default",
+        "concurrentDesc": "Billed by an annual concurrency package"
       },
       "testConnection": {
         "title": "Test Connection",

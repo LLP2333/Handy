@@ -547,6 +547,15 @@
     "doubao": {
       "title": "豆包语音识别凭据",
       "description": "在火山引擎控制台申请新版 API Key 后填入。修改后立即生效;旧的连接会自动断开重建。",
+      "provider": "火山引擎",
+      "providerDesc": "语音识别服务商 · 豆包流式语音识别",
+      "tutorial": "接入教程",
+      "getKey": "点击这里获取密钥",
+      "configured": "已配置",
+      "unconfigured": "待配置",
+      "modelSection": "模型版本",
+      "recommended": "推荐",
+      "current": "当前使用",
       "apiKey": {
         "title": "API Key (X-Api-Key)",
         "description": "新版控制台的 X-Api-Key,可在火山引擎语音识别大模型页面 → API 鉴权 中复制。",
@@ -556,7 +565,9 @@
         "title": "资源 ID (X-Api-Resource-Id)",
         "description": "选择豆包模型版本。「2.0 小时版」按音频时长计费(默认),「2.0 并发版」按并发数包年。",
         "duration": "流式语音识别 2.0(小时版)",
-        "concurrent": "流式语音识别 2.0(并发版)"
+        "concurrent": "流式语音识别 2.0(并发版)",
+        "durationDesc": "按音频时长计费 · 默认",
+        "concurrentDesc": "按并发数包年"
       },
       "testConnection": {
         "title": "测试连接",
