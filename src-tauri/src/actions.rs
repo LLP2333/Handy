@@ -458,6 +458,10 @@ impl ShortcutAction for TranscribeAction {
         }
 
         if recording_error.is_none() {
+            // 豆包引擎:录音一开始就建连并边录边传,把「松手→出字」的尾部延迟压到最低。
+            // 非豆包 / 未配置凭据时为 no-op;失败也不致命(录音器仍累积整段音频供批量兜底)。
+            tm.begin_doubao_stream(&rm);
+
             // Dynamically register the cancel shortcut in a separate task to avoid deadlock
             shortcut::register_cancel_shortcut(app);
         } else {
@@ -528,6 +532,10 @@ impl ShortcutAction for TranscribeAction {
                     samples.len()
                 );
 
+                // 录音已停(尾部音频也已喷给流式 sink),卸载 sink 停止喂帧。
+                // 非流式场景下为 no-op。
+                rm.clear_frame_sink();
+
                 if samples.is_empty() {
                     debug!("Recording produced no audio samples; skipping persistence");
                     utils::hide_recording_overlay(&ah);
@@ -543,9 +551,22 @@ impl ShortcutAction for TranscribeAction {
                         crate::audio_toolkit::save_wav_file(&wav_path, &samples_for_wav)
                     });
 
-                    // Transcribe concurrently with WAV save
+                    // Transcribe concurrently with WAV save.
+                    // 豆包边录边传:音频已在录音期间上传,这里只收尾(亚秒级);失败则回退整段批量转写。
+                    // 其它引擎沿用整段批量转写。
                     let transcription_time = Instant::now();
-                    let transcription_result = tm.transcribe(samples);
+                    let transcription_result = match tm.take_doubao_stream() {
+                        Some(session) => match session.finish() {
+                            Ok(text) => Ok(text),
+                            Err(e) => {
+                                warn!(
+                                    "Doubao streaming finalize failed ({e}); falling back to batch transcription"
+                                );
+                                tm.transcribe(samples)
+                            }
+                        },
+                        None => tm.transcribe(samples),
+                    };
 
                     // Await WAV save and verify
                     let wav_saved = match wav_handle.await {

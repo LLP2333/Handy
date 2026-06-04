@@ -17,5 +17,7 @@ mod client;
 mod payload;
 mod protocol;
 mod response;
+mod stream;
 
 pub use client::DoubaoClient;
+pub use stream::DoubaoStreamSession;

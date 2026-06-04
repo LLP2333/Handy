@@ -46,8 +46,8 @@ pub const DEFAULT_RESOURCE_ID: &str = "volc.seedasr.sauc.duration";
 const SEGMENT_DURATION_MS: usize = 200;
 /// 16 kHz、16 bit、单声道的字节速率 = 16000 * 2 * 1 = 32000 B/s。
 const PCM_BYTES_PER_SECOND: usize = 16000 * 2;
-/// 每包字节数。
-const SEGMENT_SIZE_BYTES: usize = PCM_BYTES_PER_SECOND * SEGMENT_DURATION_MS / 1000;
+/// 每包字节数(200ms)。流式会话([`super::stream`])复用同一分包尺寸。
+pub(super) const SEGMENT_SIZE_BYTES: usize = PCM_BYTES_PER_SECOND * SEGMENT_DURATION_MS / 1000;
 
 /// 豆包 ASR 客户端。
 ///
@@ -322,46 +322,62 @@ impl DoubaoClient {
         Ok(logid)
     }
 
-    /// 构造带鉴权 header 的 WebSocket 握手 Request。
+    /// 构造带鉴权 header 的 WebSocket 握手 Request(委托给模块级 [`build_doubao_handshake`])。
     ///
     /// `endpoint` 显式传入而非固定读 `self.endpoint`:转录走 async 优化版,而「测试连接」需要走
     /// nostream 端点(见 [`Self::verify_credentials`]),两者复用同一套鉴权头。
     fn build_handshake_request(&self, request_id: &str, endpoint: &str) -> Result<Request<()>> {
-        let uri: Uri = endpoint
-            .parse()
-            .map_err(|e| anyhow!("invalid Doubao endpoint URI {}: {e}", endpoint))?;
-
-        let host = uri
-            .host()
-            .ok_or_else(|| anyhow!("Doubao endpoint missing host: {}", endpoint))?
-            .to_string();
-
-        let mut req = Request::builder()
-            .method("GET")
-            .uri(uri)
-            .header("Host", host)
-            .header("Connection", "Upgrade")
-            .header("Upgrade", "websocket")
-            .header("Sec-WebSocket-Version", "13")
-            .header("Sec-WebSocket-Key", generate_key())
-            .header("X-Api-Key", HeaderValue::from_str(&self.api_key)?)
-            .header(
-                "X-Api-Resource-Id",
-                HeaderValue::from_str(&self.resource_id)?,
-            )
-            .header("X-Api-Request-Id", HeaderValue::from_str(request_id)?)
-            .header("X-Api-Connect-Id", HeaderValue::from_str(request_id)?)
-            .header("X-Api-Sequence", HeaderValue::from_static("-1"))
-            .body(())
-            .map_err(|e| anyhow!("build Doubao handshake request failed: {e}"))?;
-
-        // headers() 看起来是只读视图;上面 builder 已加完所有头,这里仅留作扩展点。
-        let _ = req.headers_mut();
-        Ok(req)
+        build_doubao_handshake(&self.api_key, &self.resource_id, request_id, endpoint)
     }
 }
 
-fn handle_parsed(parsed: super::response::DoubaoResponse, text_buf: &mut String) -> Result<()> {
+/// 构造带鉴权 header 的豆包 WebSocket 握手 Request。
+///
+/// 被 [`DoubaoClient`](批量/验证)与 [`super::stream::DoubaoStreamSession`](边录边传)共用,
+/// 避免鉴权头逻辑各写一份漂移。`endpoint` 决定接入模式(async / nostream)。
+///
+/// # Errors
+/// `endpoint` 不是合法 URI、缺少 host,或 `api_key` / `resource_id` 含非法 header 字符时返回 `Err`。
+pub(super) fn build_doubao_handshake(
+    api_key: &str,
+    resource_id: &str,
+    request_id: &str,
+    endpoint: &str,
+) -> Result<Request<()>> {
+    let uri: Uri = endpoint
+        .parse()
+        .map_err(|e| anyhow!("invalid Doubao endpoint URI {}: {e}", endpoint))?;
+
+    let host = uri
+        .host()
+        .ok_or_else(|| anyhow!("Doubao endpoint missing host: {}", endpoint))?
+        .to_string();
+
+    let mut req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .header("Host", host)
+        .header("Connection", "Upgrade")
+        .header("Upgrade", "websocket")
+        .header("Sec-WebSocket-Version", "13")
+        .header("Sec-WebSocket-Key", generate_key())
+        .header("X-Api-Key", HeaderValue::from_str(api_key)?)
+        .header("X-Api-Resource-Id", HeaderValue::from_str(resource_id)?)
+        .header("X-Api-Request-Id", HeaderValue::from_str(request_id)?)
+        .header("X-Api-Connect-Id", HeaderValue::from_str(request_id)?)
+        .header("X-Api-Sequence", HeaderValue::from_static("-1"))
+        .body(())
+        .map_err(|e| anyhow!("build Doubao handshake request failed: {e}"))?;
+
+    // headers() 看起来是只读视图;上面 builder 已加完所有头,这里仅留作扩展点。
+    let _ = req.headers_mut();
+    Ok(req)
+}
+
+pub(super) fn handle_parsed(
+    parsed: super::response::DoubaoResponse,
+    text_buf: &mut String,
+) -> Result<()> {
     if parsed.code != 0 {
         return Err(anyhow!(
             "Doubao server returned error code {}: {:?}",

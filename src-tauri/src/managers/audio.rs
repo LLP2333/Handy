@@ -1,4 +1,6 @@
-use crate::audio_toolkit::{list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad};
+use crate::audio_toolkit::{
+    list_input_devices, vad::SmoothedVad, AudioRecorder, FrameSink, SileroVad,
+};
 use crate::helpers::clamshell;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
@@ -379,6 +381,23 @@ impl AudioRecordingManager {
 
         *self.mode.lock().unwrap() = new_mode;
         Ok(())
+    }
+
+    /* ---------- streaming tap ---------------------------------------------- */
+
+    /// 挂载实时帧 sink。录音过程中每段经 VAD 过滤的 16 kHz 语音帧都会同步推给它,
+    /// 用于云端流式 ASR 的「边录边传」。录音器未就绪时静默忽略。
+    pub fn set_frame_sink(&self, sink: FrameSink) {
+        if let Some(rec) = self.recorder.lock().unwrap().as_ref() {
+            rec.set_frame_sink(sink);
+        }
+    }
+
+    /// 卸载实时帧 sink(录音结束 / 取消时调用)。多次调用安全。
+    pub fn clear_frame_sink(&self) {
+        if let Some(rec) = self.recorder.lock().unwrap().as_ref() {
+            rec.clear_frame_sink();
+        }
     }
 
     /* ---------- recording --------------------------------------------------- */

@@ -25,6 +25,13 @@ enum Cmd {
     Shutdown,
 }
 
+/// 实时帧回调:录音过程中,每产出一段 16 kHz、单声道、经 VAD 过滤的「语音」帧就同步调用一次。
+///
+/// 用途是「边录边传」:云端流式 ASR(如豆包)可在录音过程中持续上传音频,松手时只需收尾,
+/// 大幅降低「松手→出字」的尾部延迟。回调在音频消费线程上调用,实现里**必须非阻塞**(例如只做
+/// 一次 `try_send` / channel send),否则会拖慢整个采集管线。
+pub type FrameSink = Box<dyn FnMut(&[f32]) + Send + 'static>;
+
 enum AudioChunk {
     Samples(Vec<f32>),
     EndOfStream,
@@ -36,6 +43,9 @@ pub struct AudioRecorder {
     worker_handle: Option<std::thread::JoinHandle<()>>,
     vad: Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
+    /// 实时帧回调,运行期可挂载/卸载(边录边传)。与消费线程共享同一把锁,
+    /// `set_frame_sink` / `clear_frame_sink` 立即对正在进行的录音生效。
+    frame_sink: Arc<Mutex<Option<FrameSink>>>,
 }
 
 impl AudioRecorder {
@@ -46,7 +56,19 @@ impl AudioRecorder {
             worker_handle: None,
             vad: None,
             level_cb: None,
+            frame_sink: Arc::new(Mutex::new(None)),
         })
+    }
+
+    /// 挂载实时帧回调:之后每段经 VAD 过滤的语音帧都会同步推给 `sink`。
+    /// 用于在录音开始时把音频接到云端流式 ASR。重复调用会替换旧回调。
+    pub fn set_frame_sink(&self, sink: FrameSink) {
+        *self.frame_sink.lock().unwrap() = Some(sink);
+    }
+
+    /// 卸载实时帧回调(录音结束 / 取消时调用)。卸载后采集管线零额外开销。
+    pub fn clear_frame_sink(&self) {
+        *self.frame_sink.lock().unwrap() = None;
     }
 
     pub fn with_vad(mut self, vad: Box<dyn VoiceActivityDetector>) -> Self {
@@ -83,6 +105,8 @@ impl AudioRecorder {
         let vad = self.vad.clone();
         // Move the optional level callback into the worker thread
         let level_cb = self.level_cb.clone();
+        // Shared with set_frame_sink/clear_frame_sink so streaming can be (un)hooked at runtime.
+        let frame_sink = self.frame_sink.clone();
 
         let worker = std::thread::spawn(move || {
             let stop_flag = Arc::new(AtomicBool::new(false));
@@ -159,7 +183,15 @@ impl AudioRecorder {
                 Ok((stream, sample_rate)) => {
                     let _ = init_tx.send(Ok(()));
                     // Keep the stream alive while we process samples.
-                    run_consumer(sample_rate, vad, sample_rx, cmd_rx, level_cb, stop_flag);
+                    run_consumer(
+                        sample_rate,
+                        vad,
+                        sample_rx,
+                        cmd_rx,
+                        level_cb,
+                        frame_sink,
+                        stop_flag,
+                    );
                     drop(stream);
                 }
                 Err(error_message) => {
@@ -392,12 +424,14 @@ mod tests {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_consumer(
     in_sample_rate: u32,
     vad: Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
     sample_rx: mpsc::Receiver<AudioChunk>,
     cmd_rx: mpsc::Receiver<Cmd>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
+    frame_sink: Arc<Mutex<Option<FrameSink>>>,
     stop_flag: Arc<AtomicBool>,
 ) {
     let mut frame_resampler = FrameResampler::new(
@@ -425,19 +459,34 @@ fn run_consumer(
         recording: bool,
         vad: &Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
         out_buf: &mut Vec<f32>,
+        frame_sink: &Arc<Mutex<Option<FrameSink>>>,
     ) {
         if !recording {
             return;
         }
 
+        // 把一段语音帧同时:① 累积进批量 buffer(本地引擎/兜底/存 WAV),
+        // ② 推给实时 sink(云端流式边录边传)。两者拿到的是完全相同的帧。
+        let emit = |speech: &[f32]| {
+            if let Ok(mut guard) = frame_sink.lock() {
+                if let Some(sink) = guard.as_mut() {
+                    sink(speech);
+                }
+            }
+        };
+
         if let Some(vad_arc) = vad {
             let mut det = vad_arc.lock().unwrap();
             match det.push_frame(samples).unwrap_or(VadFrame::Speech(samples)) {
-                VadFrame::Speech(buf) => out_buf.extend_from_slice(buf),
+                VadFrame::Speech(buf) => {
+                    out_buf.extend_from_slice(buf);
+                    emit(buf);
+                }
                 VadFrame::Noise => {}
             }
         } else {
             out_buf.extend_from_slice(samples);
+            emit(samples);
         }
     }
 
@@ -461,7 +510,7 @@ fn run_consumer(
 
         // ---------- existing pipeline ------------------------------------ //
         frame_resampler.push(&raw, &mut |frame: &[f32]| {
-            handle_frame(frame, recording, &vad, &mut processed_samples)
+            handle_frame(frame, recording, &vad, &mut processed_samples, &frame_sink)
         });
 
         // non-blocking check for a command
@@ -488,7 +537,13 @@ fn run_consumer(
                         match sample_rx.recv_timeout(Duration::from_secs(2)) {
                             Ok(AudioChunk::Samples(remaining)) => {
                                 frame_resampler.push(&remaining, &mut |frame: &[f32]| {
-                                    handle_frame(frame, true, &vad, &mut processed_samples)
+                                    handle_frame(
+                                        frame,
+                                        true,
+                                        &vad,
+                                        &mut processed_samples,
+                                        &frame_sink,
+                                    )
                                 });
                             }
                             Ok(AudioChunk::EndOfStream) => break,
@@ -500,7 +555,7 @@ fn run_consumer(
                     }
 
                     frame_resampler.finish(&mut |frame: &[f32]| {
-                        handle_frame(frame, true, &vad, &mut processed_samples)
+                        handle_frame(frame, true, &vad, &mut processed_samples, &frame_sink)
                     });
 
                     let _ = reply_tx.send(std::mem::take(&mut processed_samples));

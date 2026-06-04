@@ -25,12 +25,15 @@ pub fn cancel_current_operation(app: &AppHandle) {
     let recording_was_active = audio_manager.is_recording();
     audio_manager.cancel_recording();
 
+    // 中止进行中的豆包流式会话(若有),并卸载录音器的实时帧 sink。
+    let tm = app.state::<Arc<TranscriptionManager>>();
+    tm.abort_doubao_stream(&audio_manager);
+
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
     hide_recording_overlay(app);
 
     // Unload model if immediate unload is enabled
-    let tm = app.state::<Arc<TranscriptionManager>>();
     tm.maybe_unload_immediately("cancellation");
 
     // Notify coordinator so it can keep lifecycle state coherent.

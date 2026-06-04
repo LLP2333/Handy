@@ -65,7 +65,7 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
   - `audio/` - Device enumeration, recording, resampling
   - `vad/` - Voice Activity Detection (Silero VAD)
 - `cloud_asr/` - Cloud ASR provider clients (network-based engines)
-  - `doubao/` - Volcano Engine (ByteDance) Doubao SeedASR 2.0 over WebSocket. See [docs/cloud-asr-doubao.md](docs/cloud-asr-doubao.md).
+ - `doubao/` - Volcano Engine (ByteDance) Doubao SeedASR 2.0 over WebSocket. `client.rs` handles batch transcription + credential verification; `stream.rs` (`DoubaoStreamSession`) does **record-while-streaming**: opens the WS when recording starts and uploads 16 kHz frames live (via a recorder `FrameSink` tap) so key-release only needs a short tail, falling back to batch on failure. See [docs/cloud-asr-doubao.md](docs/cloud-asr-doubao.md).
 - `commands/` - Tauri command handlers for frontend communication
 - `cli.rs` - CLI argument definitions (clap derive)
 - `shortcut.rs` - Global keyboard shortcut handling
@@ -96,7 +96,7 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 
 **Command-Event Architecture:** Frontend → Backend via Tauri commands; Backend → Frontend via events.
 
-**Pipeline Processing:** Audio → VAD → Local engine (Whisper/Parakeet/...) **or** Cloud client (Doubao) → Text output → Clipboard/Paste
+**Pipeline Processing:** Audio → VAD → Local engine (Whisper/Parakeet/...) **or** Cloud client (Doubao: batch, or record-while-streaming via `FrameSink` tap) → Text output → Clipboard/Paste
 
 **State Flow:** Zustand → Tauri Command → Rust State → Persistence (tauri-plugin-store)
 

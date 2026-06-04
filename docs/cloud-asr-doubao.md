@@ -21,7 +21,9 @@ Handy 自 0.8.x 版本起,在原有本地推理引擎之外,新增了**字节跳
    - `volc.seedasr.sauc.duration` —— 流式语音识别 2.0(**小时版**),按音频时长计费,用多少花多少,**Handy 默认值**
    - `volc.seedasr.sauc.concurrent` —— 流式语音识别 2.0(**并发版**),按并发数包年,适合大规模部署
 
-> 注意:Handy 选用的是 `bigmodel_nostream` 端点(非实时,准确率最高),与 Handy "录完一段再识别" 的工作流最契合。如果你想要实时上屏功能,请到 [GitHub Discussions](https://github.com/cjpais/Handy/discussions) 留言。
+> 注意:Handy 采用**边录边传**的双向流式优化端点(`bigmodel_async`)做转录——按下快捷键的那一刻就建立连接,录音过程中把音频实时上传、服务端边收边算,松手时只需收尾。相比"录完整段再上传",这把"松手 → 出字"的尾部延迟压到最低。「测试连接」按钮则走 `bigmodel_nostream` 端点(配置即时回 ACK,便于校验凭据)。如需"录音时实时上屏"的逐字效果,请到 [GitHub Discussions](https://github.com/cjpais/Handy/discussions) 留言。
+>
+> 若流式会话因网络异常中断,Handy 会自动回退到"整段批量转写"以保证不丢结果。
 
 ## 第二步:在 Handy 中配置凭据
 
@@ -38,9 +40,9 @@ Handy 自 0.8.x 版本起,在原有本地推理引擎之外,新增了**字节跳
 
 ## 第三步:验证使用
 
-1. 按下你绑定的 Handy 转录快捷键开始录音
+1. 按下你绑定的 Handy 转录快捷键开始录音(此刻已在后台建连并边录边传)
 2. 说一段话(中英文均可,默认开启 ITN 数字标点 / 标点恢复)
-3. 松开快捷键 / 停止录音 → 等待 1~3 秒
+3. 松开快捷键 / 停止录音 → 由于音频已边录边传,通常**亚秒级**即可收尾出字
 4. 文本应被自动粘贴到当前焦点应用
 
 ## 故障排查
@@ -78,7 +80,9 @@ Handy 自 0.8.x 版本起,在原有本地推理引擎之外,新增了**字节跳
 如果你是开发者,想了解 Handy 内部如何调用豆包:
 
 - 协议层(二进制 header / payload):[`src-tauri/src/cloud_asr/doubao/`](../src-tauri/src/cloud_asr/doubao/)
-- 引擎注入点:[`managers::transcription::TranscriptionManager`](../src-tauri/src/managers/transcription.rs) 的 `LoadedEngine::Doubao` 分支
+- 边录边传流式会话:[`cloud_asr/doubao/stream.rs`](../src-tauri/src/cloud_asr/doubao/stream.rs) 的 `DoubaoStreamSession`;录音器侧实时帧 tap 见 [`audio_toolkit::audio::recorder::FrameSink`](../src-tauri/src/audio_toolkit/audio/recorder.rs) 与 `AudioRecordingManager::set_frame_sink`
+- 编排:录音开始 `TranscriptionManager::begin_doubao_stream`,松手 `take_doubao_stream` + `DoubaoStreamSession::finish`(失败回退 `transcribe`),取消 `abort_doubao_stream`
+- 整段批量转写注入点:[`managers::transcription::TranscriptionManager`](../src-tauri/src/managers/transcription.rs) 的 `LoadedEngine::Doubao` 分支
 - 凭据 schema:[`AppSettings.doubao_credentials`](../src-tauri/src/settings.rs)
 - 协议参考文档:[`docs/豆包语音输入接入.md`](豆包语音输入接入.md) + [`docs/sauc_go/`](sauc_go/)(官方 Go 示例代码)
 

@@ -75,6 +75,9 @@ pub struct TranscriptionManager {
     watcher_handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
     is_loading: Arc<Mutex<bool>>,
     loading_condvar: Arc<Condvar>,
+    /// 当前进行中的豆包「边录边传」流式会话(仅豆包引擎、且已配置 API key 时存在)。
+    /// 录音开始时由 [`Self::begin_doubao_stream`] 创建,结束时由 [`Self::take_doubao_stream`] 取走收尾。
+    doubao_stream: Arc<Mutex<Option<crate::cloud_asr::doubao::DoubaoStreamSession>>>,
 }
 
 impl TranscriptionManager {
@@ -89,6 +92,7 @@ impl TranscriptionManager {
             watcher_handle: Arc::new(Mutex::new(None)),
             is_loading: Arc::new(Mutex::new(false)),
             loading_condvar: Arc::new(Condvar::new()),
+            doubao_stream: Arc::new(Mutex::new(None)),
         };
 
         // Start the idle watcher
@@ -475,6 +479,61 @@ impl TranscriptionManager {
     pub fn get_current_model(&self) -> Option<String> {
         let current_model = self.current_model_id.lock().unwrap();
         current_model.clone()
+    }
+
+    /// 若当前模型是豆包且已配置 API key,则在录音开始时启动一个「边录边传」流式会话,并把实时帧 sink
+    /// 挂到录音器上。非豆包 / 未配置凭据时直接返回(走原有「整段批量转写」)。
+    ///
+    /// 这是低延迟路径的入口:音频在录音过程中就被持续上传,松手时只需收尾。失败不致命——录音器仍照常
+    /// 累积整段音频,[`Self::take_doubao_stream`] 收尾失败时上层会回退到 [`Self::transcribe`]。
+    ///
+    /// 副作用:建立 WebSocket 连接(后台线程)、向 `rm` 注册实时帧 sink、写入 `doubao_stream` 状态。
+    pub fn begin_doubao_stream(&self, rm: &AudioRecordingManager) {
+        let settings = get_settings(&self.app_handle);
+        let is_doubao = self
+            .model_manager
+            .get_model_info(&settings.selected_model)
+            .map(|m| matches!(m.engine_type, EngineType::Doubao))
+            .unwrap_or(false);
+        if !is_doubao {
+            return;
+        }
+
+        let Some(api_key) = settings
+            .doubao_credentials
+            .get("api_key")
+            .cloned()
+            .filter(|s| !s.trim().is_empty())
+        else {
+            debug!("Doubao streaming skipped: API key not configured");
+            return;
+        };
+        let resource_id = settings
+            .doubao_credentials
+            .get("resource_id")
+            .cloned()
+            .unwrap_or_default();
+
+        let session = crate::cloud_asr::doubao::DoubaoStreamSession::start(api_key, resource_id);
+        rm.set_frame_sink(Box::new(session.frame_sink()));
+        *self.doubao_stream.lock().unwrap() = Some(session);
+        debug!("Doubao streaming session started (record-while-streaming)");
+    }
+
+    /// 取走当前的豆包流式会话(若有)。上层在录音停止后调用:`Some` 时用 [`DoubaoStreamSession::finish`]
+    /// 收尾取最终文本,`None` 时走原有整段批量转写。
+    ///
+    /// [`DoubaoStreamSession::finish`]: crate::cloud_asr::doubao::DoubaoStreamSession::finish
+    pub fn take_doubao_stream(&self) -> Option<crate::cloud_asr::doubao::DoubaoStreamSession> {
+        self.doubao_stream.lock().unwrap().take()
+    }
+
+    /// 中止进行中的豆包流式会话(取消录音时调用):先卸载录音器 sink,再丢弃会话。
+    pub fn abort_doubao_stream(&self, rm: &AudioRecordingManager) {
+        rm.clear_frame_sink();
+        if let Some(session) = self.doubao_stream.lock().unwrap().take() {
+            session.abort();
+        }
     }
 
     pub fn transcribe(&self, audio: Vec<f32>) -> Result<String> {
