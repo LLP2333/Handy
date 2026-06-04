@@ -569,6 +569,10 @@
         "durationDesc": "按音频时长计费 · 默认",
         "concurrentDesc": "按并发数包年"
       },
+      "streamingPaste": {
+        "label": "逐字上屏",
+        "description": "说话时把豆包的流式中间结果实时逐字键入当前输入框,而不是松手后整段粘贴。采用系统级键盘注入(忽略剪贴板粘贴方式),修正前文时可能出现短暂退格。仅豆包可用。"
+      },
       "testConnection": {
         "title": "测试连接",
         "description": "用当前凭据连接豆包做一次握手验证(不发送音频)。失败时会显示错误码与排错 Log ID。",

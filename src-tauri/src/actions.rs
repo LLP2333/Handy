@@ -538,6 +538,8 @@ impl ShortcutAction for TranscribeAction {
 
                 if samples.is_empty() {
                     debug!("Recording produced no audio samples; skipping persistence");
+                    // 清理可能已逐字上屏的中间文本(无内容时本就不该留下)。
+                    tm.abort_streaming_paste();
                     utils::hide_recording_overlay(&ah);
                     change_tray_icon(&ah, TrayIconState::Idle);
                 } else {
@@ -621,14 +623,24 @@ impl ShortcutAction for TranscribeAction {
                             }
 
                             if processed.final_text.is_empty() {
+                                // 清理可能已逐字上屏的中间文本。
+                                tm.abort_streaming_paste();
                                 utils::hide_recording_overlay(&ah);
                                 change_tray_icon(&ah, TrayIconState::Idle);
                             } else {
                                 let ah_clone = ah.clone();
+                                let tm_clone = Arc::clone(&tm);
                                 let paste_time = Instant::now();
                                 let final_text = processed.final_text;
                                 ah.run_on_main_thread(move || {
-                                    match utils::paste(final_text, ah_clone.clone()) {
+                                    // 逐字上屏已启用时:把屏幕文本对齐到最终文本(增量键入),不再整段重粘;
+                                    // 未启用(返回 None)时回退到原有整段粘贴。
+                                    let paste_result =
+                                        match tm_clone.finalize_streaming_paste(&final_text) {
+                                            Some(r) => r,
+                                            None => utils::paste(final_text, ah_clone.clone()),
+                                        };
+                                    match paste_result {
                                         Ok(()) => debug!(
                                             "Text pasted successfully in {:?}",
                                             paste_time.elapsed()
@@ -650,6 +662,8 @@ impl ShortcutAction for TranscribeAction {
                         }
                         Err(err) => {
                             debug!("Global Shortcut Transcription error: {}", err);
+                            // 转写失败:清理可能已逐字上屏的中间文本。
+                            tm.abort_streaming_paste();
                             // Save entry with empty text so user can retry
                             if wav_saved {
                                 if let Err(save_err) = hm.save_entry(

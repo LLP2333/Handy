@@ -558,6 +558,10 @@
         "duration": "Streaming ASR 2.0 (Hour)",
         "concurrent": "Streaming ASR 2.0 (Concurrent)"
       },
+      "streamingPaste": {
+        "label": "Streaming paste",
+        "description": "Types Doubao's live partial results into the focused input box character by character while you speak, instead of pasting everything on release. Uses direct keystroke injection (ignores the clipboard paste method) and may briefly backspace to correct earlier words. Doubao only."
+      },
       "testConnection": {
         "title": "Test Connection",
         "description": "Performs an authentication handshake with the current credentials (no audio is sent). On failure, the error code and log ID are shown for support.",

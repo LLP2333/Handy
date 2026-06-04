@@ -28,6 +28,9 @@ use transcribe_rs::{
     SpeechModel, TranscribeOptions,
 };
 
+/// 豆包流式「中间结果回调」的装箱类型:每次识别全量文本变化时以最新文本调用一次。
+type DoubaoPartialCb = Box<dyn FnMut(String) + Send>;
+
 #[derive(Clone, Debug, Serialize)]
 pub struct ModelStateEvent {
     pub event_type: String,
@@ -78,6 +81,10 @@ pub struct TranscriptionManager {
     /// 当前进行中的豆包「边录边传」流式会话(仅豆包引擎、且已配置 API key 时存在)。
     /// 录音开始时由 [`Self::begin_doubao_stream`] 创建,结束时由 [`Self::take_doubao_stream`] 取走收尾。
     doubao_stream: Arc<Mutex<Option<crate::cloud_asr::doubao::DoubaoStreamSession>>>,
+    /// 当前「逐字上屏」会话状态(仅 `streaming_paste` 开启 + 豆包 + 非 None 粘贴方式时存在)。
+    /// 与 `doubao_stream` 同生命周期:录音开始创建,松手由 [`Self::finalize_streaming_paste`] 收尾、
+    /// 取消由 [`Self::abort_streaming_paste`] 清理。
+    streaming_paste: Arc<Mutex<Option<crate::streaming_paste::StreamingPaste>>>,
 }
 
 impl TranscriptionManager {
@@ -93,6 +100,7 @@ impl TranscriptionManager {
             is_loading: Arc::new(Mutex::new(false)),
             loading_condvar: Arc::new(Condvar::new()),
             doubao_stream: Arc::new(Mutex::new(None)),
+            streaming_paste: Arc::new(Mutex::new(None)),
         };
 
         // Start the idle watcher
@@ -514,10 +522,32 @@ impl TranscriptionManager {
             .cloned()
             .unwrap_or_default();
 
-        let session = crate::cloud_asr::doubao::DoubaoStreamSession::start(api_key, resource_id);
+        // 「逐字上屏」:开启且粘贴方式非 None 时,构建中间结果回调,把豆包流式中间结果实时键入输入框。
+        let streaming_enabled =
+            settings.streaming_paste && settings.paste_method != crate::settings::PasteMethod::None;
+        let sp_state = streaming_enabled.then(crate::streaming_paste::StreamingPaste::new);
+        let on_partial: Option<DoubaoPartialCb> = sp_state.as_ref().map(|sp| {
+            let sp_for_cb = sp.clone();
+            let app = self.app_handle.clone();
+            // 回调在豆包网络线程触发 → marshal 到主线程执行 enigo 键入(与正常粘贴一致)。
+            Box::new(move |full_text: String| {
+                let sp = sp_for_cb.clone();
+                let app_main = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    sp.apply_partial(&app_main, &full_text);
+                });
+            }) as DoubaoPartialCb
+        });
+
+        let session =
+            crate::cloud_asr::doubao::DoubaoStreamSession::start(api_key, resource_id, on_partial);
         rm.set_frame_sink(Box::new(session.frame_sink()));
         *self.doubao_stream.lock().unwrap() = Some(session);
-        debug!("Doubao streaming session started (record-while-streaming)");
+        *self.streaming_paste.lock().unwrap() = sp_state;
+        debug!(
+            "Doubao streaming session started (record-while-streaming, streaming_paste={})",
+            streaming_enabled
+        );
     }
 
     /// 取走当前的豆包流式会话(若有)。上层在录音停止后调用:`Some` 时用 [`DoubaoStreamSession::finish`]
@@ -528,11 +558,35 @@ impl TranscriptionManager {
         self.doubao_stream.lock().unwrap().take()
     }
 
-    /// 中止进行中的豆包流式会话(取消录音时调用):先卸载录音器 sink,再丢弃会话。
+    /// 中止进行中的豆包流式会话(取消录音时调用):先卸载录音器 sink,再丢弃会话,并清理「逐字上屏」
+    /// 已键入的中间文本(退格删除)。
     pub fn abort_doubao_stream(&self, rm: &AudioRecordingManager) {
         rm.clear_frame_sink();
         if let Some(session) = self.doubao_stream.lock().unwrap().take() {
             session.abort();
+        }
+        self.abort_streaming_paste();
+    }
+
+    /// 「逐字上屏」松手收尾:把屏幕文本对齐到 `final_text` 并处理尾随空格 / 自动提交 / 剪贴板。
+    ///
+    /// 返回 `None` 表示本次录音未启用逐字上屏(无会话状态),上层应回退到整段 [`crate::utils::paste`];
+    /// 返回 `Some(Ok)` 表示已通过增量键入完成上屏(不应再整段粘贴);`Some(Err)` 为键入过程出错。
+    ///
+    /// 内部在主线程执行 enigo 键入,因此调用方需保证已处于主线程上下文(actions.rs 的粘贴回调即是)。
+    pub fn finalize_streaming_paste(&self, final_text: &str) -> Option<Result<(), String>> {
+        let sp = self.streaming_paste.lock().unwrap().take()?;
+        Some(sp.finalize(&self.app_handle, final_text))
+    }
+
+    /// 清理「逐字上屏」会话:把已键入的中间文本退格删除并丢弃状态。无会话时为无操作。
+    ///
+    /// 取消录音、最终文本为空、转写失败等场景调用,避免在输入框遗留半截识别文本。键入在主线程执行
+    /// (内部 marshal)。
+    pub fn abort_streaming_paste(&self) {
+        if let Some(sp) = self.streaming_paste.lock().unwrap().take() {
+            let app = self.app_handle.clone();
+            let _ = self.app_handle.run_on_main_thread(move || sp.abort(&app));
         }
     }
 

@@ -47,7 +47,15 @@ impl DoubaoStreamSession {
     ///
     /// `api_key` / `resource_id` 取自设置中的豆包凭据。建连是异步进行的——若网络/鉴权失败,错误会在
     /// [`Self::finish`] 时返回,调用方可据此回退到「整段批量转写」。
-    pub fn start(api_key: String, resource_id: String) -> Self {
+    ///
+    /// `on_partial` 为可选的中间结果回调:每当服务端回包使识别全量文本发生变化时,以最新**全量**文本
+    /// 调用一次(用于「逐字上屏」)。回调在会话 worker 线程上同步触发,实现方应自行 marshal 到需要的
+    /// 线程并保持轻量、非阻塞。`None` 时退化为原有「只在 [`Self::finish`] 取最终文本」的行为。
+    pub fn start(
+        api_key: String,
+        resource_id: String,
+        on_partial: Option<Box<dyn FnMut(String) + Send>>,
+    ) -> Self {
         let (frame_tx, frame_rx) = mpsc::unbounded_channel::<StreamMsg>();
         let (result_tx, result_rx) = std::sync::mpsc::channel::<Result<String>>();
 
@@ -64,7 +72,7 @@ impl DoubaoStreamSession {
                     return;
                 }
             };
-            let res = rt.block_on(run_session(api_key, resource_id, frame_rx));
+            let res = rt.block_on(run_session(api_key, resource_id, frame_rx, on_partial));
             let _ = result_tx.send(res);
         });
 
@@ -120,6 +128,7 @@ async fn run_session(
     api_key: String,
     resource_id: String,
     mut frame_rx: mpsc::UnboundedReceiver<StreamMsg>,
+    mut on_partial: Option<Box<dyn FnMut(String) + Send>>,
 ) -> Result<String> {
     if api_key.trim().is_empty() {
         return Err(anyhow!("Doubao API key is empty"));
@@ -152,6 +161,21 @@ async fn run_session(
     let mut seq: i32 = 2; // seq=1 是 config,音频包从 2 起
     let mut text_buf = String::new();
     let mut got_last = false;
+    // 上一次已通过 on_partial 发出的全量文本,用于去重(豆包 async「仅结果变化时回包」,但仍可能
+    // 回相同内容),避免重复触发逐字上屏的退格-重打。
+    let mut last_emitted = String::new();
+
+    // 文本若较上次变化则发出最新全量给「逐字上屏」回调。`text_buf` 在 handle_parsed 后可能更新。
+    macro_rules! emit_partial {
+        () => {
+            if let Some(cb) = on_partial.as_mut() {
+                if text_buf != last_emitted && !text_buf.is_empty() {
+                    cb(text_buf.clone());
+                    last_emitted = text_buf.clone();
+                }
+            }
+        };
+    }
 
     // 阶段一:录音进行中——并发地「收帧→满 200ms 就发」与「读服务端增量结果」。
     // 收到 Finish(或两端发送端都被丢弃 → None)时,把剩余音频作为负 seq 末包发出,进入收尾。
@@ -163,6 +187,7 @@ async fn run_session(
                         if let Ok(parsed) = parse_response(&bytes) {
                             let was_last = parsed.is_last_package;
                             handle_parsed(parsed, &mut text_buf)?;
+                            emit_partial!();
                             if was_last {
                                 got_last = true;
                                 break false; // 服务端提前给了末包(罕见),直接收尾
@@ -212,6 +237,7 @@ async fn run_session(
                     let parsed = parse_response(&bytes)?;
                     let was_last = parsed.is_last_package;
                     handle_parsed(parsed, &mut text_buf)?;
+                    emit_partial!();
                     if was_last {
                         break;
                     }
@@ -243,7 +269,7 @@ mod tests {
     /// 顺带验证 worker 线程 + 结果回传 + `finish` 收尾这套管线在离线环境下可正常工作。
     #[test]
     fn test_empty_api_key_finishes_with_error_offline() {
-        let session = DoubaoStreamSession::start(String::new(), String::new());
+        let session = DoubaoStreamSession::start(String::new(), String::new(), None);
         let err = session.finish().expect_err("empty api key must error");
         assert!(
             err.to_string().contains("API key is empty"),
@@ -254,7 +280,7 @@ mod tests {
     /// 帧 sink 必须是 `Send + 'static` 且可被调用而不 panic(即使 worker 已退出、channel 已关闭)。
     #[test]
     fn test_frame_sink_is_send_and_callable() {
-        let session = DoubaoStreamSession::start(String::new(), String::new());
+        let session = DoubaoStreamSession::start(String::new(), String::new(), None);
         let mut sink = session.frame_sink();
         // 编译期约束:sink 能跨线程移动(录音器消费线程会持有它)。
         fn assert_send<T: Send + 'static>(_: &T) {}
@@ -306,7 +332,7 @@ mod tests {
             other => panic!("unsupported wav sample format: {other:?}"),
         };
 
-        let session = DoubaoStreamSession::start(api_key, resource_id);
+        let session = DoubaoStreamSession::start(api_key, resource_id, None);
         let mut sink = session.frame_sink();
         // 模拟录音:每 ~30ms(480 个 16 kHz 采样)推一帧,帧间 sleep 模拟实时节奏。
         for frame in audio.chunks(480) {

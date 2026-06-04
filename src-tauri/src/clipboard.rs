@@ -541,7 +541,7 @@ fn paste_direct(
     input::paste_text_direct(enigo, text)
 }
 
-fn send_return_key(enigo: &mut Enigo, key_type: AutoSubmitKey) -> Result<(), String> {
+pub(crate) fn send_return_key(enigo: &mut Enigo, key_type: AutoSubmitKey) -> Result<(), String> {
     match key_type {
         AutoSubmitKey::Enter => {
             enigo

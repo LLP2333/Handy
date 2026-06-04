@@ -72,6 +72,7 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 - `settings.rs` - Application settings management
 - `overlay.rs` - Recording overlay window (platform-specific)
 - `signal_handle.rs` - `send_transcription_input()` reusable function
+- `streaming_paste.rs` - "streaming partial paste" (逐字上屏): types Doubao's live partial results into the focused input box character by character during recording (common-prefix diff + backspace + enigo direct typing). Gated by the `streaming_paste` setting; only active for Doubao + non-`None` paste method. Orchestrated via `DoubaoStreamSession::start(.., on_partial)` → main-thread `StreamingPaste::apply_partial`, finalized on key-release by `TranscriptionManager::finalize_streaming_paste`, cleaned up on cancel/error by `abort_streaming_paste`. See [docs/cloud-asr-doubao.md](docs/cloud-asr-doubao.md).
 - `utils.rs` - Platform detection helpers
 
 ### Frontend Structure (src/)
@@ -127,6 +128,7 @@ Settings are stored using Tauri's store plugin with reactive updates:
 - Audio devices (microphone/output selection)
 - Model preferences (Small/Medium/Turbo/Large Whisper variants, plus Doubao SeedASR 2.0 cloud)
 - Audio feedback and translation options
+- **Streaming partial paste** (`streaming_paste`, default off): type Doubao live partial results into the input box character by character while recording (Doubao only)
 - **Cloud ASR credentials** (`SecretMap` based, automatically redacted in debug output): currently `doubao_credentials` with keys `api_key` and `resource_id`
 
 ### Single Instance Architecture

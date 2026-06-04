@@ -1060,6 +1060,19 @@ pub fn change_append_trailing_space_setting(app: AppHandle, enabled: bool) -> Re
     Ok(())
 }
 
+/// 切换「逐字上屏」:录音时把豆包流式识别的中间结果实时键入当前输入框。
+///
+/// `enabled` 写入设置并立即持久化。仅影响豆包引擎 + 非 `None` 粘贴方式下的录音流程,下次录音生效;
+/// 对其它引擎为无操作。
+#[tauri::command]
+#[specta::specta]
+pub fn change_streaming_paste_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.streaming_paste = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_lazy_stream_close_setting(app: AppHandle, enabled: bool) -> Result<(), String> {

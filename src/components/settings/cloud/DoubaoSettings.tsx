@@ -14,6 +14,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { commands } from "@/bindings";
 import { Alert } from "../../ui/Alert";
 import { Button } from "../../ui/Button";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { useSettings } from "../../../hooks/useSettings";
 
@@ -43,7 +44,8 @@ type TestState =
  */
 export const DoubaoSettings: React.FC = () => {
   const { t } = useTranslation();
-  const { settings, refreshSettings } = useSettings();
+  const { settings, refreshSettings, getSetting, updateSetting, isUpdating } =
+    useSettings();
 
   const credentials = settings?.doubao_credentials ?? {};
   const apiKey = credentials.api_key ?? "";
@@ -267,6 +269,18 @@ export const DoubaoSettings: React.FC = () => {
                 );
               })}
             </div>
+          </div>
+
+          {/* 逐字上屏 —— 录音时把流式中间结果实时键入输入框 */}
+          <div className="border-t border-mid-gray/20 pt-3">
+            <ToggleSwitch
+              checked={getSetting("streaming_paste") ?? false}
+              onChange={(enabled) => updateSetting("streaming_paste", enabled)}
+              isUpdating={isUpdating("streaming_paste")}
+              label={t("settings.doubao.streamingPaste.label")}
+              description={t("settings.doubao.streamingPaste.description")}
+              descriptionMode="tooltip"
+            />
           </div>
 
           {/* 测试连接 */}

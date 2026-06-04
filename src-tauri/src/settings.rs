@@ -405,6 +405,12 @@ pub struct AppSettings {
     pub mute_while_recording: bool,
     #[serde(default)]
     pub append_trailing_space: bool,
+    /// 「逐字上屏」:录音时把豆包流式识别的中间结果实时键入当前输入框(说一个字、上屏一个字)。
+    ///
+    /// 仅在豆包引擎 + 非 `None` 粘贴方式下生效;开启后录音过程走系统级键盘注入(enigo),会忽略
+    /// 剪贴板粘贴路径。默认关闭。详见 [`crate::streaming_paste`]。
+    #[serde(default)]
+    pub streaming_paste: bool,
     #[serde(default = "default_app_language")]
     pub app_language: String,
     #[serde(default)]
@@ -820,6 +826,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_selected_prompt_id: None,
         mute_while_recording: false,
         append_trailing_space: false,
+        streaming_paste: false,
         app_language: default_app_language(),
         experimental_enabled: false,
         lazy_stream_close: false,
@@ -976,6 +983,11 @@ mod tests {
         let settings = get_default_settings();
         assert!(!settings.auto_submit);
         assert_eq!(settings.auto_submit_key, AutoSubmitKey::Enter);
+    }
+
+    #[test]
+    fn streaming_paste_defaults_off() {
+        assert!(!get_default_settings().streaming_paste);
     }
 
     #[test]
