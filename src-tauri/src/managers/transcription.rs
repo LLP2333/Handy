@@ -2,7 +2,7 @@ use crate::audio_toolkit::{apply_custom_words, filter_transcription_output};
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::model::{EngineType, ModelManager};
 use crate::settings::{
-    get_settings, ModelUnloadTimeout, OrtAcceleratorSetting, WhisperAcceleratorSetting,
+    get_settings, AppSettings, ModelUnloadTimeout, OrtAcceleratorSetting, WhisperAcceleratorSetting,
 };
 use anyhow::Result;
 use log::{debug, error, info, warn};
@@ -30,6 +30,34 @@ use transcribe_rs::{
 
 /// 豆包流式「中间结果回调」的装箱类型:每次识别全量文本变化时以最新文本调用一次。
 type DoubaoPartialCb = Box<dyn FnMut(String) + Send>;
+
+/// 引擎原始输出的统一文本后处理:自定义词汇纠正 + 填充词/幻觉过滤。
+///
+/// `skip_custom_words` 为 `true` 时跳过词汇纠正——Whisper 引擎已把词表注入
+/// `initial_prompt`,再跑相似度纠正属于重复处理。
+///
+/// 批量路径([`TranscriptionManager::transcribe`])与豆包流式收尾(`actions.rs`)
+/// 共用本函数,保证两条路径对同一段原始文本产出一致结果。
+pub fn postprocess_transcript_text(
+    raw_text: &str,
+    skip_custom_words: bool,
+    settings: &AppSettings,
+) -> String {
+    let corrected = if !settings.custom_words.is_empty() && !skip_custom_words {
+        apply_custom_words(
+            raw_text,
+            &settings.custom_words,
+            settings.word_correction_threshold,
+        )
+    } else {
+        raw_text.to_string()
+    };
+    filter_transcription_output(
+        &corrected,
+        &settings.app_language,
+        &settings.custom_filler_words,
+    )
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct ModelStateEvent {
@@ -558,6 +586,21 @@ impl TranscriptionManager {
         self.doubao_stream.lock().unwrap().take()
     }
 
+    /// 按当前设置对一段引擎原始输出做统一后处理(自定义词纠正 + 填充词过滤)。
+    ///
+    /// [`Self::transcribe`](批量路径)内部已应用同样的处理;豆包「边录边传」流式收尾
+    /// 的文本不经过 `transcribe`,由 `actions.rs` 对 `finish()` 结果显式调用本方法,
+    /// 保证流式与批量两条路径行为一致。
+    pub fn postprocess_transcript(&self, raw_text: &str) -> String {
+        let settings = get_settings(&self.app_handle);
+        let is_whisper = self
+            .model_manager
+            .get_model_info(&settings.selected_model)
+            .map(|info| matches!(info.engine_type, EngineType::Whisper))
+            .unwrap_or(false);
+        postprocess_transcript_text(raw_text, is_whisper, &settings)
+    }
+
     /// 中止进行中的豆包流式会话(取消录音时调用):先卸载录音器 sink,再丢弃会话,并清理「逐字上屏」
     /// 已键入的中间文本(退格删除)。
     pub fn abort_doubao_stream(&self, rm: &AudioRecordingManager) {
@@ -882,30 +925,14 @@ impl TranscriptionManager {
             }
         };
 
-        // Apply word correction if custom words are configured.
-        // Skip for Whisper models since custom words are already passed as initial_prompt.
+        // Whisper 已把自定义词表注入 initial_prompt,后处理里跳过相似度纠正。
         let is_whisper = self
             .model_manager
             .get_model_info(&settings.selected_model)
             .map(|info| matches!(info.engine_type, EngineType::Whisper))
             .unwrap_or(false);
 
-        let corrected_result = if !settings.custom_words.is_empty() && !is_whisper {
-            apply_custom_words(
-                &result.text,
-                &settings.custom_words,
-                settings.word_correction_threshold,
-            )
-        } else {
-            result.text
-        };
-
-        // Filter out filler words and hallucinations
-        let filtered_result = filter_transcription_output(
-            &corrected_result,
-            &settings.app_language,
-            &settings.custom_filler_words,
-        );
+        let filtered_result = postprocess_transcript_text(&result.text, is_whisper, &settings);
 
         let et = std::time::Instant::now();
         let translation_note = if settings.translate_to_english {
@@ -1050,5 +1077,35 @@ impl Drop for TranscriptionManager {
                 debug!("Idle watcher thread joined successfully");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::get_default_settings;
+
+    /// 精确小写匹配的自定义词应被纠正为词表原始大小写;`skip_custom_words`(Whisper 路径)
+    /// 时保持原样。这是流式/批量两条路径共用后处理的核心行为。
+    #[test]
+    fn test_postprocess_applies_custom_words_unless_skipped() {
+        let mut settings = get_default_settings();
+        settings.custom_words = vec!["Handy".to_string()];
+
+        let corrected = postprocess_transcript_text("handy is nice", false, &settings);
+        assert_eq!(corrected, "Handy is nice");
+
+        let skipped = postprocess_transcript_text("handy is nice", true, &settings);
+        assert_eq!(skipped, "handy is nice");
+    }
+
+    /// 没有配置自定义词时,普通文本原样通过(不被误改)。
+    #[test]
+    fn test_postprocess_passthrough_without_custom_words() {
+        let settings = get_default_settings();
+        assert_eq!(
+            postprocess_transcript_text("hello world", false, &settings),
+            "hello world"
+        );
     }
 }

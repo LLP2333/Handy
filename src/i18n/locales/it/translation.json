@@ -121,6 +121,11 @@
         "checkFailed": "Impossibile verificare i permessi. Riprova.",
         "requestFailed": "Impossibile richiedere il permesso. Riprova."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Oppure usa un modello cloud — nessun download richiesto",
+      "useModel": "Usa questo modello",
+      "needsCredentials": "Inserisci la tua chiave API qui sopra per abilitare questo modello."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
     },
     "cancel": "Annulla",
-    "cancelDownload": "Annulla download"
+    "cancelDownload": "Annulla download",
+    "notConfigured": "Chiave API non configurata"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "Dopo 15 minuti",
           "hour1": "Dopo 1 ora",
           "sec15": "Dopo 15 secondi (Debug)"
-        }
+        },
+        "cloudNote": "Si applica solo ai modelli locali. Il modello cloud attivo non mantiene alcun motore locale in memoria."
       },
       "customWords": {
         "title": "Parole personalizzate",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Fatturazione per durata audio · predefinito",
+        "concurrentDesc": "Fatturazione con pacchetto annuale di concorrenza"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao rileva automaticamente la lingua parlata. Questa opzione controlla solo l'output in cinese semplificato o tradizionale.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Fornitore di riconoscimento vocale · ASR in streaming Doubao",
+      "tutorial": "Guida alla configurazione",
+      "getKey": "Ottieni la tua chiave API",
+      "configured": "Configurato",
+      "unconfigured": "Non configurato",
+      "modelSection": "Edizione del modello",
+      "recommended": "Consigliato",
+      "current": "In uso"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "Impossibile caricare il modello: {{model}}",
     "modelLoadFailedUnknown": "modello sconosciuto",
     "pasteFailedTitle": "Impossibile incollare il testo",
-    "pasteFailed": "Non è stato possibile incollare il testo nell'applicazione attiva."
+    "pasteFailed": "Non è stato possibile incollare il testo nell'applicazione attiva.",
+    "transcriptionFailedTitle": "Trascrizione non riuscita"
   },
   "appLanguage": {
     "title": "Lingua Applicazione",

@@ -121,6 +121,11 @@
         "checkFailed": "Misslyckades med att kontrollera behörigheter. Försök igen.",
         "requestFailed": "Misslyckades med att begära behörighet. Försök igen."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Eller använd en molnmodell — ingen nedladdning krävs",
+      "useModel": "Använd denna modell",
+      "needsCredentials": "Ange din API-nyckel ovan för att aktivera denna modell."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "translate": "Översätt till engelska",
       "cloud": "Cloud",
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
-    }
+    },
+    "notConfigured": "API-nyckel ej konfigurerad"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "Efter 15 minuter",
           "hour1": "Efter 1 timme",
           "sec15": "Efter 15 sekunder (Felsökning)"
-        }
+        },
+        "cloudNote": "Gäller endast lokala modeller. Den aktiva molnmodellen håller ingen lokal motor i minnet."
       },
       "customWords": {
         "title": "Anpassade ord",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Debitering per ljudlängd · standard",
+        "concurrentDesc": "Debitering via årligt samtidighetspaket"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao identifierar det talade språket automatiskt. Detta val styr endast utdata i förenklad eller traditionell kinesiska.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Leverantör av taligenkänning · Doubao strömmande ASR",
+      "tutorial": "Installationsguide",
+      "getKey": "Hämta din API-nyckel",
+      "configured": "Konfigurerad",
+      "unconfigured": "Inte konfigurerad",
+      "modelSection": "Modellutgåva",
+      "recommended": "Rekommenderas",
+      "current": "Används"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "noInputDeviceTitle": "Ingen mikrofon hittades",
     "noInputDevice": "Ingen ljudenhet hittades. Anslut en mikrofon eller ett headset och försök igen.",
     "pasteFailedTitle": "Det gick inte att klistra in texten",
-    "pasteFailed": "Texten kunde inte klistras in i det aktiva programmet."
+    "pasteFailed": "Texten kunde inte klistras in i det aktiva programmet.",
+    "transcriptionFailedTitle": "Transkriptionen misslyckades"
   },
   "appLanguage": {
     "title": "Applikationsspråk",

@@ -1,10 +1,12 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { Cloud } from "lucide-react";
 import type { ModelInfo } from "@/bindings";
 import {
   getTranslatedModelName,
   getTranslatedModelDescription,
 } from "../../lib/utils/modelTranslation";
+import { useSettings } from "../../hooks/useSettings";
 
 interface ModelDropdownProps {
   models: ModelInfo[];
@@ -18,7 +20,17 @@ const ModelDropdown: React.FC<ModelDropdownProps> = ({
   onModelSelect,
 }) => {
   const { t } = useTranslation();
+  const { settings } = useSettings();
   const downloadedModels = models.filter((m) => m.is_downloaded);
+
+  // 云端模型即使未配置凭据也保留在列表里(配置入口在 Settings → Models),
+  // 但要标出"未配置",否则选中后要到转写失败时才发现不可用。
+  const isCloudModelUnconfigured = (model: ModelInfo): boolean => {
+    if (model.engine_type === "Doubao") {
+      return (settings?.doubao_credentials?.api_key ?? "").trim().length === 0;
+    }
+    return false;
+  };
 
   const handleModelClick = (modelId: string) => {
     onModelSelect(modelId);
@@ -48,11 +60,22 @@ const ModelDropdown: React.FC<ModelDropdownProps> = ({
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-text/80">
-                    {getTranslatedModelName(model, t)}
+                  <div className="flex items-center gap-1.5 text-sm text-text/80">
+                    <span>{getTranslatedModelName(model, t)}</span>
+                    {model.is_cloud && (
+                      <Cloud
+                        className="w-3 h-3 shrink-0 text-logo-primary/70"
+                        aria-label={t("modelSelector.capabilities.cloud")}
+                      />
+                    )}
                     {model.is_custom && (
-                      <span className="ms-1.5 text-[10px] font-medium text-text/40 uppercase">
+                      <span className="text-[10px] font-medium text-text/40 uppercase">
                         {t("modelSelector.custom")}
+                      </span>
+                    )}
+                    {isCloudModelUnconfigured(model) && (
+                      <span className="shrink-0 rounded bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-500">
+                        {t("modelSelector.notConfigured")}
                       </span>
                     )}
                   </div>

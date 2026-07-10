@@ -121,6 +121,11 @@
         "checkFailed": "בדיקת ההרשאות נכשלה. נסה שוב.",
         "requestFailed": "בקשת ההרשאה נכשלה. נסה שוב."
       }
+    },
+    "cloud": {
+      "sectionTitle": "או השתמשו במודל ענן — ללא הורדה",
+      "useModel": "השתמש במודל זה",
+      "needsCredentials": "הזינו את מפתח ה-API למעלה כדי להפעיל מודל זה."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "translate": "תרגם לאנגלית",
       "cloud": "Cloud",
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
-    }
+    },
+    "notConfigured": "מפתח API לא מוגדר"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "אחרי 15 דקות",
           "hour1": "אחרי שעה",
           "sec15": "אחרי 15 שניות (דיבאג)"
-        }
+        },
+        "cloudNote": "חל על מודלים מקומיים בלבד. מודל הענן הפעיל אינו מחזיק מנוע מקומי בזיכרון."
       },
       "customWords": {
         "title": "מילים מותאמות אישית",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "חיוב לפי משך שמע · ברירת מחדל",
+        "concurrentDesc": "חיוב לפי חבילת מקביליות שנתית"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao מזהה את שפת הדיבור אוטומטית. אפשרות זו שולטת רק בפלט סינית מפושטת או מסורתית.",
+      "provider": "Volcano Engine",
+      "providerDesc": "ספק זיהוי דיבור · Doubao ASR בסטרימינג",
+      "tutorial": "מדריך התקנה",
+      "getKey": "קבלת מפתח API",
+      "configured": "מוגדר",
+      "unconfigured": "לא מוגדר",
+      "modelSection": "מהדורת מודל",
+      "recommended": "מומלץ",
+      "current": "בשימוש"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "טעינת המודל נכשלה: {{model}}",
     "modelLoadFailedUnknown": "מודל לא ידוע",
     "pasteFailedTitle": "ההדבקה נכשלה",
-    "pasteFailed": "לא ניתן היה להדביק את הטקסט ביישום הפעיל."
+    "pasteFailed": "לא ניתן היה להדביק את הטקסט ביישום הפעיל.",
+    "transcriptionFailedTitle": "התמלול נכשל"
   },
   "appLanguage": {
     "title": "שפת האפליקציה",

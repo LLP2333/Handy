@@ -1,4 +1,4 @@
-use crate::settings::{get_settings, write_settings};
+use crate::settings::{get_settings, write_settings, AppSettings};
 use anyhow::Result;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
@@ -56,6 +56,27 @@ pub struct ModelInfo {
     /// 前端用此字段隐藏下载/删除/大小等 UI 元素。
     #[serde(default)]
     pub is_cloud: bool,
+}
+
+/// 判断模型当前是否"开箱可用":本地模型看文件是否已下载;云端模型看凭据是否已配置
+/// (豆包要求 `api_key` 非空)。
+///
+/// onboarding 判定(`has_any_models_available`)与启动时的自动选择共用此逻辑。
+/// 云端模型的 `is_downloaded` 恒为 `true`,若直接用它判断,新装用户会被视为"已有模型"
+/// 而跳过模型引导页,并被自动选中一个按下快捷键只会报错的未配置云端模型。
+pub fn is_model_ready_for_use(model: &ModelInfo, settings: &AppSettings) -> bool {
+    if !model.is_cloud {
+        return model.is_downloaded;
+    }
+    match model.engine_type {
+        EngineType::Doubao => settings
+            .doubao_credentials
+            .get("api_key")
+            .map(|key| !key.trim().is_empty())
+            .unwrap_or(false),
+        // 新增云端引擎时必须在此登记对应的凭据检查;默认按"未配置"处理最安全。
+        _ => false,
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -707,6 +728,18 @@ impl ModelManager {
         models.get(model_id).cloned()
     }
 
+    /// 是否存在至少一个"开箱可用"的模型(本地已下载,或云端已配置凭据)。
+    ///
+    /// 供 `has_any_models_available` 等 onboarding 判定使用,判定标准见
+    /// [`is_model_ready_for_use`]。
+    pub fn has_any_usable_models(&self) -> bool {
+        let settings = get_settings(&self.app_handle);
+        let models = self.available_models.lock().unwrap();
+        models
+            .values()
+            .any(|model| is_model_ready_for_use(model, &settings))
+    }
+
     fn migrate_bundled_models(&self) -> Result<()> {
         // Check for bundled models and copy them to user directory
         let bundled_models = ["ggml-small.bin"]; // Add other bundled models here if any
@@ -855,11 +888,21 @@ impl ModelManager {
             }
         }
 
-        // If no model is selected, pick the first downloaded one
+        // If no model is selected, pick the first usable one
         if settings.selected_model.is_empty() {
-            // Find the first available (downloaded) model
             let models = self.available_models.lock().unwrap();
-            if let Some(available_model) = models.values().find(|model| model.is_downloaded) {
+            // 优先本地已下载模型,其次才是已配置凭据的云端模型:HashMap 迭代顺序不定,
+            // 若不加偏好,本地/云端同时可用时可能随机选中依赖网络的引擎。
+            // 未配置凭据的云端模型不参与自动选择(见 is_model_ready_for_use)。
+            let candidate = models
+                .values()
+                .find(|model| !model.is_cloud && model.is_downloaded)
+                .or_else(|| {
+                    models
+                        .values()
+                        .find(|model| is_model_ready_for_use(model, &settings))
+                });
+            if let Some(available_model) = candidate {
                 info!(
                     "Auto-selecting model: {} ({})",
                     available_model.id, available_model.name
@@ -1720,6 +1763,64 @@ mod tests {
             !path.exists(),
             "partial file must be deleted after hash mismatch"
         );
+    }
+
+    // ── is_model_ready_for_use tests ─────────────────────────────────────────
+
+    /// Helper: minimal ModelInfo for readiness tests.
+    fn make_model(is_cloud: bool, is_downloaded: bool, engine_type: EngineType) -> ModelInfo {
+        ModelInfo {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+            description: String::new(),
+            filename: String::new(),
+            url: None,
+            sha256: None,
+            size_mb: 0,
+            is_downloaded,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type,
+            accuracy_score: 0.0,
+            speed_score: 0.0,
+            supports_translation: false,
+            is_recommended: false,
+            supported_languages: vec![],
+            supports_language_selection: false,
+            is_custom: false,
+            is_cloud,
+        }
+    }
+
+    #[test]
+    fn test_local_model_readiness_follows_download_state() {
+        let settings = crate::settings::get_default_settings();
+        let downloaded = make_model(false, true, EngineType::Whisper);
+        let not_downloaded = make_model(false, false, EngineType::Whisper);
+
+        assert!(is_model_ready_for_use(&downloaded, &settings));
+        assert!(!is_model_ready_for_use(&not_downloaded, &settings));
+    }
+
+    #[test]
+    fn test_cloud_model_requires_configured_credentials() {
+        // 默认设置的 api_key 为空 → 云端模型不可用,即使 is_downloaded=true
+        let mut settings = crate::settings::get_default_settings();
+        let doubao = make_model(true, true, EngineType::Doubao);
+        assert!(!is_model_ready_for_use(&doubao, &settings));
+
+        // 纯空白的 key 也视为未配置
+        settings
+            .doubao_credentials
+            .insert("api_key".to_string(), "   ".to_string());
+        assert!(!is_model_ready_for_use(&doubao, &settings));
+
+        // 配置了非空 key 后可用
+        settings
+            .doubao_credentials
+            .insert("api_key".to_string(), "sk-test".to_string());
+        assert!(is_model_ready_for_use(&doubao, &settings));
     }
 
     #[test]

@@ -121,6 +121,11 @@
         "checkFailed": "Проверката на разрешенията не бе успешна. Опитайте отново.",
         "requestFailed": "Заявката за разрешение не бе успешна. Опитайте отново."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Или използвайте облачен модел — без изтегляне",
+      "useModel": "Използвай този модел",
+      "needsCredentials": "Въведете вашия API ключ по-горе, за да активирате този модел."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "translate": "Превод на английски",
       "cloud": "Cloud",
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
-    }
+    },
+    "notConfigured": "API ключът не е конфигуриран"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "След 15 минути",
           "hour1": "След 1 час",
           "sec15": "След 15 секунди (отстраняване)"
-        }
+        },
+        "cloudNote": "Отнася се само за локални модели. Активният облачен модел не държи локален двигател в паметта."
       },
       "customWords": {
         "title": "Персонализирани думи",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Таксуване по продължителност на аудиото · по подразбиране",
+        "concurrentDesc": "Таксуване чрез годишен пакет за паралелност"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao автоматично разпознава говоримия език. Тази опция контролира само изхода на опростен или традиционен китайски.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Доставчик на разпознаване на реч · поточен ASR Doubao",
+      "tutorial": "Ръководство за настройка",
+      "getKey": "Вземете своя API ключ",
+      "configured": "Конфигурирано",
+      "unconfigured": "Не е конфигурирано",
+      "modelSection": "Издание на модела",
+      "recommended": "Препоръчано",
+      "current": "Използва се"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "Зареждането на модела не бе успешно: {{model}}",
     "modelLoadFailedUnknown": "неизвестен модел",
     "pasteFailedTitle": "Неуспешно поставяне на текст",
-    "pasteFailed": "Текстът не можа да бъде поставен в активното приложение."
+    "pasteFailed": "Текстът не можа да бъде поставен в активното приложение.",
+    "transcriptionFailedTitle": "Транскрипцията е неуспешна"
   },
   "appLanguage": {
     "title": "Език на приложението",

@@ -121,6 +121,11 @@
         "checkFailed": "检查权限失败。请重试。",
         "requestFailed": "请求权限失败。请重试。"
       }
+    },
+    "cloud": {
+      "sectionTitle": "或使用云端模型——无需下载",
+      "useModel": "使用此模型",
+      "needsCredentials": "请先在上方填写 API Key,再启用此模型。"
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "cloudModel": "云端模型,使用前需要配置 API 凭据"
     },
     "cancel": "取消",
-    "cancelDownload": "取消下载"
+    "cancelDownload": "取消下载",
+    "notConfigured": "未配置 API Key"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "15 分钟后",
           "hour1": "1 小时后",
           "sec15": "15 秒后（调试）"
-        }
+        },
+        "cloudNote": "仅对本地模型生效。当前的云端模型不会在内存中驻留本地引擎。"
       },
       "customWords": {
         "title": "自定义词汇",
@@ -581,7 +588,8 @@
         "success": "连接成功!凭据可用。",
         "successWithLogid": "连接成功!Log ID:{{logid}}",
         "failed": "连接失败:{{error}}"
-      }
+      },
+      "languageNote": "豆包云端会自动识别语种;此选项仅决定中文输出使用简体或繁体。"
     }
   },
   "footer": {
@@ -644,7 +652,8 @@
     "modelLoadFailed": "加载模型失败: {{model}}",
     "modelLoadFailedUnknown": "未知模型",
     "pasteFailedTitle": "粘贴文本失败",
-    "pasteFailed": "无法将文本粘贴到当前活动的应用程序中。"
+    "pasteFailed": "无法将文本粘贴到当前活动的应用程序中。",
+    "transcriptionFailedTitle": "转写失败"
   },
   "appLanguage": {
     "title": "应用语言",

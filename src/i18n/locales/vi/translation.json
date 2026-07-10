@@ -121,6 +121,11 @@
         "checkFailed": "Không thể kiểm tra quyền. Vui lòng thử lại.",
         "requestFailed": "Không thể yêu cầu quyền. Vui lòng thử lại."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Hoặc dùng mô hình đám mây — không cần tải xuống",
+      "useModel": "Dùng mô hình này",
+      "needsCredentials": "Nhập API key của bạn ở trên để bật mô hình này."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
     },
     "cancel": "Hủy",
-    "cancelDownload": "Hủy tải xuống"
+    "cancelDownload": "Hủy tải xuống",
+    "notConfigured": "Chưa cấu hình API key"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "Sau 15 phút",
           "hour1": "Sau 1 giờ",
           "sec15": "Sau 15 giây (Gỡ lỗi)"
-        }
+        },
+        "cloudNote": "Chỉ áp dụng cho mô hình cục bộ. Mô hình đám mây đang dùng không giữ engine cục bộ trong bộ nhớ."
       },
       "customWords": {
         "title": "Từ tùy chỉnh",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Tính phí theo thời lượng âm thanh · mặc định",
+        "concurrentDesc": "Tính phí theo gói đồng thời hằng năm"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao tự động nhận diện ngôn ngữ nói. Tùy chọn này chỉ điều khiển đầu ra tiếng Trung giản thể hoặc phồn thể.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Nhà cung cấp nhận dạng giọng nói · ASR trực tuyến Doubao",
+      "tutorial": "Hướng dẫn thiết lập",
+      "getKey": "Lấy API key của bạn",
+      "configured": "Đã cấu hình",
+      "unconfigured": "Chưa cấu hình",
+      "modelSection": "Phiên bản mô hình",
+      "recommended": "Khuyến nghị",
+      "current": "Đang dùng"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "Không thể tải mô hình: {{model}}",
     "modelLoadFailedUnknown": "mô hình không xác định",
     "pasteFailedTitle": "Không thể dán văn bản",
-    "pasteFailed": "Không thể dán văn bản vào ứng dụng đang hoạt động."
+    "pasteFailed": "Không thể dán văn bản vào ứng dụng đang hoạt động.",
+    "transcriptionFailedTitle": "Phiên âm thất bại"
   },
   "appLanguage": {
     "title": "Ngôn ngữ ứng dụng",

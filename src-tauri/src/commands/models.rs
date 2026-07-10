@@ -196,23 +196,26 @@ pub async fn is_model_loading(
     Ok(current_model.is_none())
 }
 
+/// 是否存在至少一个"开箱可用"的模型。用于 onboarding 判定:返回 `false` 时前端进入
+/// 完整首次引导(模型选择页)。
+///
+/// 本地模型要求已下载;云端模型要求凭据已配置——云端模型 `is_downloaded` 恒为 `true`,
+/// 不能直接当可用性用,否则新用户永远看不到模型引导页。
 #[tauri::command]
 #[specta::specta]
 pub async fn has_any_models_available(
     model_manager: State<'_, Arc<ModelManager>>,
 ) -> Result<bool, String> {
-    let models = model_manager.get_available_models();
-    Ok(models.iter().any(|m| m.is_downloaded))
+    Ok(model_manager.has_any_usable_models())
 }
 
+/// 与 [`has_any_models_available`] 同判定(可用模型对云端要求凭据已配置)。
 #[tauri::command]
 #[specta::specta]
 pub async fn has_any_models_or_downloads(
     model_manager: State<'_, Arc<ModelManager>>,
 ) -> Result<bool, String> {
-    let models = model_manager.get_available_models();
-    // Return true if any models are downloaded OR if any downloads are in progress
-    Ok(models.iter().any(|m| m.is_downloaded))
+    Ok(model_manager.has_any_usable_models())
 }
 
 #[tauri::command]

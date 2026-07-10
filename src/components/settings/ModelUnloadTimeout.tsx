@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
+import { useModelStore } from "../../stores/modelStore";
 import { commands, type ModelUnloadTimeout } from "@/bindings";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
@@ -16,6 +17,12 @@ export const ModelUnloadTimeoutSetting: React.FC<ModelUnloadTimeoutProps> = ({
 }) => {
   const { t } = useTranslation();
   const { settings, getSetting, updateSetting } = useSettings();
+  const { currentModel, models } = useModelStore();
+
+  // 云端模型没有本地引擎驻留内存,此设置对它不生效(只影响之后切回的本地模型)。
+  // 激活云端模型时换用说明文案,避免"释放 GPU/CPU 内存"的描述造成误导。
+  const isCloudModelActive =
+    models.find((m) => m.id === currentModel)?.is_cloud ?? false;
 
   const timeoutOptions = [
     {
@@ -76,7 +83,11 @@ export const ModelUnloadTimeoutSetting: React.FC<ModelUnloadTimeoutProps> = ({
   return (
     <SettingContainer
       title={t("settings.advanced.modelUnload.title")}
-      description={t("settings.advanced.modelUnload.description")}
+      description={
+        isCloudModelActive
+          ? t("settings.advanced.modelUnload.cloudNote")
+          : t("settings.advanced.modelUnload.description")
+      }
       descriptionMode={descriptionMode}
       grouped={grouped}
     >

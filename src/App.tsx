@@ -7,7 +7,11 @@ import {
   checkAccessibilityPermission,
   checkMicrophonePermission,
 } from "tauri-plugin-macos-permissions-api";
-import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
+import {
+  ModelStateEvent,
+  RecordingErrorEvent,
+  TranscriptionErrorEvent,
+} from "./lib/types/events";
 import "./App.css";
 import AccessibilityPermissions from "./components/AccessibilityPermissions";
 import Footer from "./components/footer";
@@ -117,6 +121,23 @@ function App() {
         );
       }
     });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [t]);
+
+  // Listen for transcription pipeline failures and show a toast.
+  // Local engines rarely hit this path, but cloud engines (Doubao) fail on
+  // network loss / bad credentials / quota — those must be visible to the user.
+  useEffect(() => {
+    const unlisten = listen<TranscriptionErrorEvent>(
+      "transcription-error",
+      (event) => {
+        toast.error(t("errors.transcriptionFailedTitle"), {
+          description: event.payload.error,
+        });
+      },
+    );
     return () => {
       unlisten.then((fn) => fn());
     };

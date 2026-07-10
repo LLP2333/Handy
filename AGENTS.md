@@ -97,7 +97,7 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 
 **Command-Event Architecture:** Frontend → Backend via Tauri commands; Backend → Frontend via events.
 
-**Pipeline Processing:** Audio → VAD → Local engine (Whisper/Parakeet/...) **or** Cloud client (Doubao: batch, or record-while-streaming via `FrameSink` tap) → Text output → Clipboard/Paste
+**Pipeline Processing:** Audio → VAD → Local engine (Whisper/Parakeet/...) **or** Cloud client (Doubao: batch, or record-while-streaming via `FrameSink` tap) → `TranscriptionManager::postprocess_transcript` (custom-word correction + filler filtering; shared by the batch path and the Doubao streaming finalize so both produce identical output) → Text output → Clipboard/Paste. Pipeline failures emit a `transcription-error` event (frontend shows a toast — important for cloud engines where network/credential/quota errors are routine).
 
 **State Flow:** Zustand → Tauri Command → Rust State → Persistence (tauri-plugin-store)
 
@@ -115,7 +115,7 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 ### Application Flow
 
 1. **Initialization:** App starts minimized to tray, loads settings, initializes managers
-2. **Model Setup:** First-run downloads preferred Whisper model (Small/Medium/Turbo/Large). Cloud models (e.g. Doubao) skip download but require API credentials.
+2. **Model Setup:** First-run downloads preferred Whisper model (Small/Medium/Turbo/Large). Cloud models (e.g. Doubao) skip download but require API credentials. A cloud model only counts as "available" (`has_any_models_available` onboarding check + startup auto-select, see `is_model_ready_for_use` in `managers/model.rs`) once its credentials are configured; the onboarding screen lists cloud models in a separate "cloud" section with an inline credential form ("use this model" instead of download).
 3. **Recording:** Global shortcut triggers audio recording with VAD filtering
 4. **Processing:** Audio sent to selected engine — local model via [transcribe-rs](https://crates.io/crates/transcribe-rs), or cloud provider via the corresponding `cloud_asr/<provider>` client (currently Doubao over WebSocket).
 5. **Output:** Text pasted to active application via system clipboard

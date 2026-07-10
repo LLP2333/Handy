@@ -121,6 +121,11 @@
         "checkFailed": "Nepodařilo se zkontrolovat oprávnění. Zkuste to prosím znovu.",
         "requestFailed": "Nepodařilo se požádat o oprávnění. Zkuste to prosím znovu."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Nebo použijte cloudový model — bez stahování",
+      "useModel": "Použít tento model",
+      "needsCredentials": "Zadejte výše svůj API klíč, abyste tento model povolili."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
     },
     "cancel": "Zrušit",
-    "cancelDownload": "Zrušit stahování"
+    "cancelDownload": "Zrušit stahování",
+    "notConfigured": "API klíč není nastaven"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "Po 15 minutách",
           "hour1": "Po 1 hodině",
           "sec15": "Po 15 sekundách (Debug)"
-        }
+        },
+        "cloudNote": "Platí pouze pro lokální modely. Aktivní cloudový model nedrží v paměti žádný lokální engine."
       },
       "customWords": {
         "title": "Vlastní slova",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Účtování podle délky zvuku · výchozí",
+        "concurrentDesc": "Účtování podle ročního balíčku souběžnosti"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao rozpozná mluvený jazyk automaticky. Tato volba řídí pouze výstup ve zjednodušené nebo tradiční čínštině.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Poskytovatel rozpoznávání řeči · streamovací ASR Doubao",
+      "tutorial": "Průvodce nastavením",
+      "getKey": "Získat API klíč",
+      "configured": "Nakonfigurováno",
+      "unconfigured": "Nenakonfigurováno",
+      "modelSection": "Edice modelu",
+      "recommended": "Doporučeno",
+      "current": "Používá se"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "Nepodařilo se načíst model: {{model}}",
     "modelLoadFailedUnknown": "neznámý model",
     "pasteFailedTitle": "Vložení textu se nezdařilo",
-    "pasteFailed": "Text nebylo možné vložit do aktivní aplikace."
+    "pasteFailed": "Text nebylo možné vložit do aktivní aplikace.",
+    "transcriptionFailedTitle": "Přepis se nezdařil"
   },
   "appLanguage": {
     "title": "Jazyk aplikace",

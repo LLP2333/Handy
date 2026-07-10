@@ -27,6 +27,14 @@ struct RecordingErrorEvent {
     detail: Option<String>,
 }
 
+/// 转写管线失败时发给前端的事件载荷("transcription-error")。
+/// 云端引擎(断网 / 凭据失效 / 配额用尽)失败是常态路径,必须让用户看到,
+/// 而不是 overlay 一关什么都没发生。
+#[derive(Clone, serde::Serialize)]
+struct TranscriptionErrorEvent {
+    error: String,
+}
+
 /// Drop guard that notifies the [`TranscriptionCoordinator`] when the
 /// transcription pipeline finishes — whether it completes normally or panics.
 struct FinishGuard(AppHandle);
@@ -558,8 +566,10 @@ impl ShortcutAction for TranscribeAction {
                     // 其它引擎沿用整段批量转写。
                     let transcription_time = Instant::now();
                     let transcription_result = match tm.take_doubao_stream() {
+                        // 流式收尾的文本不经过 tm.transcribe,需显式过一遍统一后处理
+                        // (自定义词纠正 + 填充词过滤),否则与批量兜底路径行为不一致。
                         Some(session) => match session.finish() {
-                            Ok(text) => Ok(text),
+                            Ok(text) => Ok(tm.postprocess_transcript(&text)),
                             Err(e) => {
                                 warn!(
                                     "Doubao streaming finalize failed ({e}); falling back to batch transcription"
@@ -661,7 +671,15 @@ impl ShortcutAction for TranscribeAction {
                             }
                         }
                         Err(err) => {
-                            debug!("Global Shortcut Transcription error: {}", err);
+                            error!("Transcription failed: {}", err);
+                            // 通知前端弹 toast:本地引擎极少走到这里,但云端引擎的
+                            // 网络/凭据/配额错误对用户必须可见。
+                            let _ = ah.emit(
+                                "transcription-error",
+                                TranscriptionErrorEvent {
+                                    error: err.to_string(),
+                                },
+                            );
                             // 转写失败:清理可能已逐字上屏的中间文本。
                             tm.abort_streaming_paste();
                             // Save entry with empty text so user can retry

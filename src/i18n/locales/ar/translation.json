@@ -121,6 +121,11 @@
         "checkFailed": "فشل التحقق من الأذونات. يرجير المحاولة مرة أخرى.",
         "requestFailed": "فشل طلب الإذن. يرجى المحاولة مرة أخرى."
       }
+    },
+    "cloud": {
+      "sectionTitle": "أو استخدم نموذجًا سحابيًا — دون تنزيل",
+      "useModel": "استخدام هذا النموذج",
+      "needsCredentials": "أدخل مفتاح API أعلاه لتفعيل هذا النموذج."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "translate": "ترجمة",
       "cloud": "Cloud",
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
-    }
+    },
+    "notConfigured": "لم يتم تكوين مفتاح API"
   },
   "settings": {
     "general": {
@@ -331,7 +337,8 @@
           "min15": "بعد 15 دقيقة",
           "hour1": "بعد ساعة واحدة",
           "sec15": "بعد 15 ثوانٍ (تصحيح أخطاء)"
-        }
+        },
+        "cloudNote": "ينطبق على النماذج المحلية فقط. النموذج السحابي النشط لا يحتفظ بمحرك محلي في الذاكرة."
       },
       "customWords": {
         "title": "كلمات مخصصة",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "الفوترة حسب مدة الصوت · افتراضي",
+        "concurrentDesc": "الفوترة عبر باقة تزامن سنوية"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "يكتشف Doubao اللغة المنطوقة تلقائيًا. يتحكم هذا الخيار فقط في إخراج الصينية المبسطة أو التقليدية.",
+      "provider": "Volcano Engine",
+      "providerDesc": "مزوّد التعرف على الكلام · Doubao ASR المتدفق",
+      "tutorial": "دليل الإعداد",
+      "getKey": "احصل على مفتاح API",
+      "configured": "تم التكوين",
+      "unconfigured": "غير مكوَّن",
+      "modelSection": "إصدار النموذج",
+      "recommended": "موصى به",
+      "current": "قيد الاستخدام"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "فشل في تحميل النموذج: {{model}}",
     "modelLoadFailedUnknown": "نموذج غير معروف",
     "pasteFailedTitle": "فشل لصق النص",
-    "pasteFailed": "تعذر لصق النص في التطبيق النشط."
+    "pasteFailed": "تعذر لصق النص في التطبيق النشط.",
+    "transcriptionFailedTitle": "فشل النسخ"
   },
   "appLanguage": {
     "title": "لغة التطبيق",

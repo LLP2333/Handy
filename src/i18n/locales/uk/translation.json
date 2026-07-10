@@ -121,6 +121,11 @@
         "checkFailed": "Не вдалося перевірити дозволи. Будь ласка, спробуйте ще раз.",
         "requestFailed": "Не вдалося запросити дозвіл. Будь ласка, спробуйте ще раз."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Або використовуйте хмарну модель — без завантаження",
+      "useModel": "Використати цю модель",
+      "needsCredentials": "Введіть свій API-ключ вище, щоб увімкнути цю модель."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
     },
     "cancel": "Скасувати",
-    "cancelDownload": "Скасувати завантаження"
+    "cancelDownload": "Скасувати завантаження",
+    "notConfigured": "API-ключ не налаштовано"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "Через 15 хвилин",
           "hour1": "Через 1 годину",
           "sec15": "Через 15 секунд (Дебаг)"
-        }
+        },
+        "cloudNote": "Стосується лише локальних моделей. Активна хмарна модель не тримає локальний рушій у пам'яті."
       },
       "customWords": {
         "title": "Власні слова",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Оплата за тривалістю аудіо · за замовчуванням",
+        "concurrentDesc": "Оплата за річним пакетом паралельності"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao автоматично визначає мову мовлення. Ця опція керує лише виводом спрощеної чи традиційної китайської.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Постачальник розпізнавання мовлення · потоковий ASR Doubao",
+      "tutorial": "Посібник із налаштування",
+      "getKey": "Отримати API-ключ",
+      "configured": "Налаштовано",
+      "unconfigured": "Не налаштовано",
+      "modelSection": "Редакція моделі",
+      "recommended": "Рекомендовано",
+      "current": "Використовується"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "Не вдалося завантажити модель: {{model}}",
     "modelLoadFailedUnknown": "невідома модель",
     "pasteFailedTitle": "Не вдалося вставити текст",
-    "pasteFailed": "Не вдалося вставити текст до активної програми."
+    "pasteFailed": "Не вдалося вставити текст до активної програми.",
+    "transcriptionFailedTitle": "Помилка транскрипції"
   },
   "appLanguage": {
     "title": "Мова інтерфейсу",

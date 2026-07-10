@@ -121,6 +121,11 @@
         "checkFailed": "İzinler kontrol edilemedi. Lütfen tekrar deneyin.",
         "requestFailed": "İzin isteği başarısız oldu. Lütfen tekrar deneyin."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Veya bir bulut modeli kullanın — indirme gerekmez",
+      "useModel": "Bu modeli kullan",
+      "needsCredentials": "Bu modeli etkinleştirmek için yukarıya API anahtarınızı girin."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
     },
     "cancel": "İptal",
-    "cancelDownload": "İndirmeyi iptal et"
+    "cancelDownload": "İndirmeyi iptal et",
+    "notConfigured": "API anahtarı yapılandırılmadı"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "15 dakika sonra",
           "hour1": "1 saat sonra",
           "sec15": "15 saniye sonra (Debug)"
-        }
+        },
+        "cloudNote": "Yalnızca yerel modeller için geçerlidir. Etkin bulut modeli bellekte yerel motor tutmaz."
       },
       "customWords": {
         "title": "Özel Kelimeler",
@@ -556,7 +563,9 @@
         "title": "Resource ID (X-Api-Resource-Id)",
         "description": "Pick a Doubao model edition. 'Hour' bills by audio duration (default); 'Concurrent' bills by yearly concurrency package.",
         "duration": "Streaming ASR 2.0 (Hour)",
-        "concurrent": "Streaming ASR 2.0 (Concurrent)"
+        "concurrent": "Streaming ASR 2.0 (Concurrent)",
+        "durationDesc": "Ses süresine göre faturalandırma · varsayılan",
+        "concurrentDesc": "Yıllık eşzamanlılık paketiyle faturalandırma"
       },
       "streamingPaste": {
         "label": "Streaming paste",
@@ -570,7 +579,17 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao konuşulan dili otomatik algılar. Bu seçenek yalnızca Çince çıktının Basitleştirilmiş/Geleneksel olmasını kontrol eder.",
+      "provider": "Volcano Engine",
+      "providerDesc": "Konuşma tanıma sağlayıcısı · Doubao akışlı ASR",
+      "tutorial": "Kurulum kılavuzu",
+      "getKey": "API anahtarınızı alın",
+      "configured": "Yapılandırıldı",
+      "unconfigured": "Yapılandırılmadı",
+      "modelSection": "Model sürümü",
+      "recommended": "Önerilen",
+      "current": "Kullanımda"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "Model yüklenemedi: {{model}}",
     "modelLoadFailedUnknown": "bilinmeyen model",
     "pasteFailedTitle": "Metin yapıştırılamadı",
-    "pasteFailed": "Metin etkin uygulamaya yapıştırılamadı."
+    "pasteFailed": "Metin etkin uygulamaya yapıştırılamadı.",
+    "transcriptionFailedTitle": "Transkripsiyon başarısız"
   },
   "appLanguage": {
     "title": "Uygulama Dili",

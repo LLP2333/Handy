@@ -32,6 +32,14 @@ type TestState =
   | { status: "success"; logid: string }
   | { status: "error"; message: string };
 
+export interface DoubaoSettingsProps {
+  /**
+   * 初始是否展开凭据表单。设置页默认折叠(头部作为入口);onboarding 场景传 true,
+   * 用户点开云端模型卡片后直接看到 API Key 输入框,少一次点击。
+   */
+  defaultExpanded?: boolean;
+}
+
 /**
  * 火山引擎(豆包)流式语音识别服务商配置面板。
  *
@@ -40,9 +48,12 @@ type TestState =
  * 带「推荐 / 当前使用」徽章),以及一次轻量握手的「测试连接」。
  *
  * 鉴权用新版控制台的 `X-Api-Key`(而非旧版 App ID + Access Token),与后端
- * `DoubaoClient` 的握手实现保持一致。仅在豆包模型卡片下渲染,见 `ModelsSettings.tsx`。
+ * `DoubaoClient` 的握手实现保持一致。在豆包模型卡片下渲染(`ModelsSettings.tsx`),
+ * onboarding 的云端模型卡片亦复用(`Onboarding.tsx`)。
  */
-export const DoubaoSettings: React.FC = () => {
+export const DoubaoSettings: React.FC<DoubaoSettingsProps> = ({
+  defaultExpanded = false,
+}) => {
   const { t } = useTranslation();
   const { settings, refreshSettings, getSetting, updateSetting, isUpdating } =
     useSettings();
@@ -56,7 +67,7 @@ export const DoubaoSettings: React.FC = () => {
   const [savingResource, setSavingResource] = useState(false);
   const [testState, setTestState] = useState<TestState>({ status: "idle" });
   // 默认折叠:头部常驻作为入口,凭据表单按需展开,避免与模型卡片堆成两个紧贴的框
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   // 当用户切换模型再切回豆包时,重置测试状态
   useEffect(() => {

@@ -121,6 +121,11 @@
         "checkFailed": "檢查權限失敗，請重試",
         "requestFailed": "請求權限失敗，請重試"
       }
+    },
+    "cloud": {
+      "sectionTitle": "或使用雲端模型——無需下載",
+      "useModel": "使用此模型",
+      "needsCredentials": "請先在上方填寫 API Key,再啟用此模型。"
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "translate": "翻譯為英語",
       "cloud": "云端",
       "cloudModel": "云端模型,使用前需要配置 API 凭据"
-    }
+    },
+    "notConfigured": "未設定 API Key"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "15 分鐘後",
           "hour1": "1 小時後",
           "sec15": "15 秒後（偵錯）"
-        }
+        },
+        "cloudNote": "僅對本地模型生效。目前的雲端模型不會在記憶體中駐留本地引擎。"
       },
       "customWords": {
         "title": "自訂詞彙",
@@ -556,7 +563,9 @@
         "title": "资源 ID (X-Api-Resource-Id)",
         "description": "选择豆包模型版本。「2.0 小时版」按音频时长计费(默认),「2.0 并发版」按并发数包年。",
         "duration": "流式语音识别 2.0(小时版)",
-        "concurrent": "流式语音识别 2.0(并发版)"
+        "concurrent": "流式语音识别 2.0(并发版)",
+        "durationDesc": "按音訊時長計費 · 預設",
+        "concurrentDesc": "按年度並行套餐計費"
       },
       "streamingPaste": {
         "label": "逐字上螢幕",
@@ -570,7 +579,17 @@
         "success": "连接成功!凭据可用。",
         "successWithLogid": "连接成功!Log ID:{{logid}}",
         "failed": "连接失败:{{error}}"
-      }
+      },
+      "languageNote": "豆包雲端會自動辨識語種;此選項僅決定中文輸出使用簡體或繁體。",
+      "provider": "火山引擎",
+      "providerDesc": "語音辨識服務商 · 豆包串流語音辨識",
+      "tutorial": "接入教學",
+      "getKey": "取得 API Key",
+      "configured": "已設定",
+      "unconfigured": "未設定",
+      "modelSection": "模型版本",
+      "recommended": "推薦",
+      "current": "目前使用"
     }
   },
   "footer": {
@@ -633,7 +652,8 @@
     "modelLoadFailed": "載入模型失敗: {{model}}",
     "modelLoadFailedUnknown": "未知模型",
     "pasteFailedTitle": "貼上文字失敗",
-    "pasteFailed": "無法將文字貼上至目前作用中的應用程式。"
+    "pasteFailed": "無法將文字貼上至目前作用中的應用程式。",
+    "transcriptionFailedTitle": "轉寫失敗"
   },
   "appLanguage": {
     "title": "應用程式語言",

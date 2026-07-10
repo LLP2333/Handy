@@ -9,12 +9,18 @@ interface LanguageSelectorProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   supportedLanguages?: string[];
+  /**
+   * 覆盖默认描述文案。云端引擎(豆包)语种由服务端自动判别,语言选择只影响
+   * 中文简繁输出,需要用不同的说明避免误导,见 `ModelSettingsCard`。
+   */
+  description?: string;
 }
 
 export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   descriptionMode = "tooltip",
   grouped = false,
   supportedLanguages,
+  description,
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateSetting, resetSetting, isUpdating } = useSettings();
@@ -101,7 +107,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   return (
     <SettingContainer
       title={t("settings.general.language.title")}
-      description={t("settings.general.language.description")}
+      description={description ?? t("settings.general.language.description")}
       descriptionMode={descriptionMode}
       grouped={grouped}
     >

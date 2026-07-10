@@ -9,6 +9,7 @@ import ModelDropdown from "./ModelDropdown";
 import DownloadProgressDisplay from "./DownloadProgressDisplay";
 
 import { ModelStateEvent } from "@/lib/types/events";
+import { useSettings } from "../../hooks/useSettings";
 
 type ModelStatus =
   | "ready"
@@ -36,6 +37,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
     selectModel,
   } = useModelStore();
 
+  const { settings } = useSettings();
   const [modelStatus, setModelStatus] = useState<ModelStatus>("unloaded");
   const [modelError, setModelError] = useState<string | null>(null);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
@@ -45,6 +47,14 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const displayModelId = pendingModelId || currentModel;
+
+  // 云端引擎按需建连,没有本地"加载进内存"的概念:凭据配置好即视为就绪,
+  // 未配置则显式提示,而不是显示令人困惑的灰色 "unloaded"。
+  const displayModelInfo = models.find((m) => m.id === displayModelId);
+  const isCloudCurrent = displayModelInfo?.is_cloud ?? false;
+  const cloudCredentialsConfigured =
+    displayModelInfo?.engine_type !== "Doubao" ||
+    (settings?.doubao_credentials?.api_key ?? "").trim().length > 0;
 
   // Check model status when currentModel changes
   useEffect(() => {
@@ -202,6 +212,10 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
 
     const currentModelInfo = models.find((m) => m.id === displayModelId);
 
+    if (isCloudCurrent && !cloudCredentialsConfigured) {
+      return t("modelSelector.notConfigured");
+    }
+
     switch (modelStatus) {
       case "ready":
         return currentModelInfo
@@ -239,6 +253,10 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
     if (Object.keys(verifyingModels).length > 0) return "verifying";
     if (Object.keys(extractingModels).length > 0) return "extracting";
     if (Object.keys(downloadProgress).length > 0) return "downloading";
+    if (isCloudCurrent) {
+      if (!cloudCredentialsConfigured) return "error";
+      if (modelStatus === "unloaded") return "ready";
+    }
     return modelStatus;
   };
 

@@ -121,6 +121,11 @@
         "checkFailed": "Failed to check permissions. Please try again.",
         "requestFailed": "Failed to request permission. Please try again."
       }
+    },
+    "cloud": {
+      "sectionTitle": "Or use a cloud model — no download required",
+      "useModel": "Use this model",
+      "needsCredentials": "Enter your API key above to enable this model."
     }
   },
   "modelSelector": {
@@ -154,7 +159,8 @@
       "translate": "Translate to English",
       "cloud": "Cloud",
       "cloudModel": "Cloud-hosted model — configure API credentials before use"
-    }
+    },
+    "notConfigured": "API key not configured"
   },
   "settings": {
     "modelSettings": {
@@ -353,7 +359,8 @@
           "min15": "After 15 minutes",
           "hour1": "After 1 hour",
           "sec15": "After 15 seconds (Debug)"
-        }
+        },
+        "cloudNote": "Applies to local models only. The active cloud model keeps no local engine in memory."
       },
       "customWords": {
         "title": "Custom Words",
@@ -581,7 +588,8 @@
         "success": "Connection succeeded — credentials are valid.",
         "successWithLogid": "Connection succeeded. Log ID: {{logid}}",
         "failed": "Connection failed: {{error}}"
-      }
+      },
+      "languageNote": "Doubao detects the spoken language automatically. This option only controls Simplified vs. Traditional output for Chinese."
     }
   },
   "footer": {
@@ -644,7 +652,8 @@
     "modelLoadFailed": "Failed to load model: {{model}}",
     "modelLoadFailedUnknown": "unknown model",
     "pasteFailedTitle": "Failed to Paste Text",
-    "pasteFailed": "Text could not be pasted into the active application."
+    "pasteFailed": "Text could not be pasted into the active application.",
+    "transcriptionFailedTitle": "Transcription Failed"
   },
   "appLanguage": {
     "title": "Application Language",

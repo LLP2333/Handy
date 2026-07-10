@@ -22,6 +22,14 @@ export const ModelSettingsCard: React.FC = () => {
     return null;
   }
 
+  // 豆包 async 流式协议不支持 language 字段,语种由云端自动判别;语言选择唯一仍然
+  // 生效的部分是中文简繁输出(OpenCC 后处理)。因此把选项收窄为简/繁并换用说明文案,
+  // 避免展示 27 种"选了也没用"的语言。
+  const isDoubao = currentModelInfo.engine_type === "Doubao";
+  const selectorLanguages = isDoubao
+    ? ["zh-Hans", "zh-Hant"]
+    : currentModelInfo.supported_languages;
+
   return (
     <SettingsGroup
       title={t("settings.modelSettings.title", {
@@ -32,7 +40,8 @@ export const ModelSettingsCard: React.FC = () => {
         <LanguageSelector
           descriptionMode="tooltip"
           grouped={true}
-          supportedLanguages={currentModelInfo.supported_languages}
+          supportedLanguages={selectorLanguages}
+          description={isDoubao ? t("settings.doubao.languageNote") : undefined}
         />
       )}
       {supportsTranslation && (
